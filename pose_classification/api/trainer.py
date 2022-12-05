@@ -1,15 +1,20 @@
-from model import PoseClassifierV1, model_gateway
-from data import NormalPoseDataset
+# -*- coding: utf-8 -*-
+# author: Trung Pham (EDABK lab - HUST)
+# description: Script define trainer for pose classification
+import os
+import json
+import numpy as np
+import argparse
 import torch.nn as nn
-import torch.nn.functional as F 
+import torch.nn.functional as F
 from torchvision.transforms import ToTensor
 import torch.utils.data.dataloader
-from utils import load_config, accuracy
-from focal_loss import FocalLoss
-import os
-import json 
-import numpy as np
-import argparse 
+
+from model.model import PoseClassifierV1, model_gateway
+from data.data import NormalPoseDataset
+from utils.utils import load_config, accuracy
+from utils.focal_loss import FocalLoss
+
 
 def parse_argument():
     """
@@ -21,10 +26,12 @@ def parse_argument():
         Object for argument parser
 
     """
-    parser = argparse.ArgumentParser("Run script to train pose classification model")
-    parser.add_argument('--config-path', type=str, 
+    parser = argparse.ArgumentParser(
+        "Run script to train pose classification model")
+    parser.add_argument('--config-path', type=str,
                         help='Path to training config file', default="./cfg/train_config.json")
     return parser
+
 
 def init_weights(m):
     if type(m) in [nn.Module, nn.Linear, nn.Conv1d]:
@@ -33,6 +40,14 @@ def init_weights(m):
 
 class PoseTrainer():
     def __init__(self, config_path):
+        """
+        Init trainer class
+
+        Parameters
+        ----------
+        config_path : dict
+            Config for trainer as dictionary
+        """
         self.config = load_config(config_path)
         self.data_config = self.config['data']
         self.model_config = self.config['model']
@@ -41,10 +56,10 @@ class PoseTrainer():
 
         self.model = model_gateway(self.config)
         self.train_dataset = NormalPoseDataset(self.data_config['data_dir'],
-                                         self.data_config['train_list'],
-                                         augment_config_path=self.data_config['augmentation_config_path'])
+                                               self.data_config['train_list'],
+                                               augment_config_path=self.data_config['augmentation_config_path'])
         self.test_dataset = NormalPoseDataset(self.data_config['data_dir'],
-                                        self.data_config['test_list'])
+                                              self.data_config['test_list'])
         self.device = self.config["device"]
         self.loss_calculate = FocalLoss()
         self.trainloader = None
@@ -53,13 +68,20 @@ class PoseTrainer():
         self.scheduler = None
 
     def initialize(self):
+        """
+            Init some hyper parameter such as optimizer, scheduler and create data loader for trainer
+        Raises
+        ------
+        ValueError
+            Raise ValueError if config for optimizer is not SGD
+        """
         self.model.apply(init_weights)
         self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
-                                                      batch_size=self.data_config['batch_size'],
-                                                      shuffle=self.data_config['shuffle'],
-                                                      num_workers=self.data_config['num_workers'],
-                                                      pin_memory=self.data_config['pin_memory']
-                                                      )
+                                                       batch_size=self.data_config['batch_size'],
+                                                       shuffle=self.data_config['shuffle'],
+                                                       num_workers=self.data_config['num_workers'],
+                                                       pin_memory=self.data_config['pin_memory']
+                                                       )
         self.testloader = torch.utils.data.DataLoader(self.test_dataset,
                                                       batch_size=self.data_config['batch_size'],
                                                       shuffle=self.data_config['shuffle'],
@@ -82,6 +104,14 @@ class PoseTrainer():
         print("Successfully init trainer")
 
     def run_train(self):
+        """
+        Main function to run train
+
+        Returns
+        -------
+        list
+            Loss report
+        """
         print("Start to train pose classification model")
         loss_report = list()
         best_lost = np.inf
@@ -111,8 +141,19 @@ class PoseTrainer():
             json.dump(loss_report, f)
         return loss_report
 
-
     def train_step(self, batch):
+        """Run train for a step corresponding to a batch
+
+        Parameters
+        ----------
+        batch : tuple
+            A data bacth
+
+        Returns
+        -------
+        float
+            Loss value
+        """
         inputs, labels = batch
         # print(inputs.shape)
         out = self.model(inputs, self.device)
@@ -123,6 +164,18 @@ class PoseTrainer():
         return loss
 
     def validation_step(self, batch):
+        """Validate model for each step (batch)
+
+        Parameters
+        ----------
+        batch : tuple
+            A data batch for validation
+
+        Returns
+        -------
+        dict
+            {val loss, val acc}
+        """
         inputs, labels = batch
         out = self.model(inputs, self.device)
         # loss = F.cross_entropy(out, labels)
@@ -130,8 +183,19 @@ class PoseTrainer():
         acc = accuracy(out, labels)
         return {'val_loss': loss, 'val_acc': acc}
 
-
     def validation_epoch_end(self, outputs):
+        """Calculate everage loss and acc on validation dataset
+
+        Parameters
+        ----------
+        outputs : list
+            list of dict with elements are epoch outputs
+
+        Returns
+        -------
+        dict
+            {avg val loss, avg val acc}
+        """
         batch_losses = [x['val_loss'] for x in outputs]
         epoch_loss = torch.stack(batch_losses).mean()
         batch_accs = [x['val_acc'] for x in outputs]
@@ -139,17 +203,47 @@ class PoseTrainer():
         return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
 
     def evaluate(self, dataloader):
-        """Evaluate the model's performance on the validation set"""
+        """Evaluate model on a dataset
+
+        Parameters
+        ----------
+        dataloader : torch dataloader
+            A dataloader in torch
+
+        Returns
+        -------
+        dict
+            {loss on dataset, acc on dataset}
+        """
         outputs = [self.validation_step(batch) for batch in dataloader]
         return self.validation_epoch_end(outputs)
 
     def epoch_end(self, epoch, result):
-        print("Epoch [{}], val_loss: {:.4f}, val_acc: {:.4f}".format(epoch, result['val_loss'], result['val_acc']))
+        """Print result at the end of epoch
+
+        Parameters
+        ----------
+        epoch : int
+            epoch index
+        result : dict
+            a dict contain result (acc and loss)
+        """
+        print("Epoch [{}], val_loss: {:.4f}, val_acc: {:.4f}".format(
+            epoch, result['val_loss'], result['val_acc']))
 
     def save_model(self, model_name):
+        """Save model as .pth file
+
+        Parameters
+        ----------
+        model_name : str
+            model name file
+        """
         print('\n*INFO: Saving model...*\n')
-        save_path = os.path.join(self.training_config['output_dir'], model_name)
-        torch.save(self.model.state_dict(), save_path) 
+        save_path = os.path.join(
+            self.training_config['output_dir'], model_name)
+        torch.save(self.model.state_dict(), save_path)
+
 
 def main():
     parser = parse_argument()
@@ -157,9 +251,10 @@ def main():
 
     trainer = PoseTrainer(args.config_path)
     trainer.initialize()
-    loss_report=trainer.run_train()
+    loss_report = trainer.run_train()
     # with open("loss_report.json", "w") as f:
     #     json.dump({"loss_report": loss_report}, f)
+
 
 if __name__ == "__main__":
     main()

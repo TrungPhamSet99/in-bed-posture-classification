@@ -1,11 +1,11 @@
-import os 
-import json 
+import os
+import json
 import argparse
 from model import model_gateway, End2EndPoseClassifer
 from data import End2EndDataset
 import torch
 import torch.nn as nn
-import torch.nn.functional as F 
+import torch.nn.functional as F
 from torchvision.transforms import ToTensor
 from utils import load_config, accuracy, pose_to_embedding_v1, plot_confusion_matrix, pose_to_embedding_v2
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix, classification_report
@@ -14,6 +14,7 @@ from sklearn.metrics import precision_recall_fscore_support as score
 CLASSES = ["supine_0", "supine_1", "supine_2", "lying_left_0", "lying_left_1", "lying_left_2",
            "lying_right_0", "lying_right_1", "lying_righ_2"]
 
+
 class End2EndEvaluator:
     def __init__(self, config_path):
         self.config = load_config(config_path)
@@ -21,16 +22,17 @@ class End2EndEvaluator:
         for k in self.config.keys():
             if "_model" not in k:
                 continue
-            setattr(self, k, model_gateway(self.config[k]["model_name"], model_config)) 
+            setattr(self, k, model_gateway(
+                self.config[k]["model_name"], model_config))
         # print(self.raw_model)
         self.end2end_evaluator = End2EndPoseClassifer(self.raw_model, self.supine_model,
-                                                  self.lying_left_model, self.lying_right_model)
+                                                      self.lying_left_model, self.lying_right_model)
         self.test_dataset = End2EndDataset(self.config["data"]["data_dir"],
-                                             self.config["data"]["mapping_file"],
-                                             self.config["data"]["mode"])
+                                           self.config["data"]["mapping_file"],
+                                           self.config["data"]["mode"])
         self.testloader = torch.utils.data.DataLoader(self.test_dataset, batch_size=32,
-                                                          shuffle=False, num_workers=4,
-                                                          pin_memory=False)
+                                                      shuffle=False, num_workers=4,
+                                                      pin_memory=False)
 
     def initialize(self):
         # Load weight for 4 model
@@ -44,7 +46,6 @@ class End2EndEvaluator:
             self.device = torch.device("cuda:1")
         else:
             self.device = torch.device('cpu')
-
 
     def run(self):
         label = []
@@ -61,6 +62,7 @@ class End2EndEvaluator:
 
         return label, prediction
 
+
 def parse_argument():
     """
     Parse arguments from command line
@@ -71,8 +73,9 @@ def parse_argument():
         Object for argument parser
 
     """
-    parser = argparse.ArgumentParser("Run script to train pose classification model")
-    parser.add_argument('--config-path', type=str, 
+    parser = argparse.ArgumentParser(
+        "Run script to train pose classification model")
+    parser.add_argument('--config-path', type=str,
                         help='Path to training config file', default="./cfg/end2end_config.json")
     return parser
 
@@ -93,10 +96,11 @@ def main():
     print('support: {}'.format(support))
     print(report)
 
-    plot_confusion_matrix(labels, prediction, CLASSES, normalize=False, title="Non-normalized confusion matrix (all)", 
+    plot_confusion_matrix(labels, prediction, CLASSES, normalize=False, title="Non-normalized confusion matrix (all)",
                           savepath="Non_normalized_confusion_matrix.png")
-    plot_confusion_matrix(labels, prediction, CLASSES, normalize=True, title="Normalized confusion matrix (all)", 
+    plot_confusion_matrix(labels, prediction, CLASSES, normalize=True, title="Normalized confusion matrix (all)",
                           savepath="Normalized_confusion_matrix.png")
+
 
 if __name__ == "__main__":
     main()
