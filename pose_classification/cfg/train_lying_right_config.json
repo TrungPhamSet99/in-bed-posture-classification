@@ -1,0 +1,40 @@
+{
+	"model":{
+		"pose_classifier_v1":{
+			"linear1": [44, 128],
+			"linear2": [128, 256],	     
+			"linear3": [256, 128],
+			"linear4": [128, 64],
+			"linear5": [64,32],
+			"linear6": [32,16],
+			"linear7": [16,3]
+		}
+	},
+	"optimizer":{
+		"name": "SGD",
+		"lr": 0.01,
+		"momentum": 0.9,
+		"weight_decay": 0.0001,
+		"lr_step": [300,500],
+		"lr_factor": 0.1
+	},
+	"data": {
+		"data_dir": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/",
+		"train_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_right_train_list.txt",
+		"test_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_right_test_list.txt",
+		"classes": ["7", "8", "9"],
+		"batch_size": 64,
+		"shuffle": true,
+		"num_workers": 4,
+		"pin_memory": false,
+		"augmentation_config_path": "/data/users/trungpq/22A/hrnet_pose_estimate/deep-high-resolution-net.pytorch/pose_classification/cfg/augmentation.json"
+	},
+	"training": {
+		"epoch": 2000,
+		"output_dir": "./lying_right_train_output/",
+		"saving_interval": 50,
+		"loss_report_path": "loss_report.json"
+	},
+	"device":"cuda:1",
+	"model_name": "pose_classifier_v1"
+}

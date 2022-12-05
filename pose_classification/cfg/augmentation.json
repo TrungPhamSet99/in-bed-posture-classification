@@ -1,0 +1,24 @@
+{
+	"prob": 0.5,
+	"methods":
+	{
+		"group1":{
+			"prob": [0.25, 0.25, 0.25, 0.25],
+			"sub_methods_magnitude":{
+				"up": [5,15],
+				"down": [5,15],
+				"left":[5,15],
+				"right": [5,15]
+			}
+		},
+		"group2":{
+			"prob": [0.25, 0.25, 0.25, 0.25],
+			"sub_methods_magnitude":{
+				"up_right": [5,15],
+				"up_left": [5,15],
+				"down_right": [5,15],
+				"down_left": [5,15]
+			}
+		}
+	}
+}
