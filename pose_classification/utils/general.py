@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# author: OSS (refer to github) and Trung Pham (EDABK lab - HUST)
+# description: Script define utility functions used in pose classification module
 import torch
 import os
 import numpy as np
@@ -5,7 +8,7 @@ import json
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 
-SLP_dict = {"Right Ankle": 0, "Right Knee": 1, "Right Hip": 2, "Left Hip": 3, "Left Knee": 4, "Left Ankle": 5, "Right Wrist": 6,
+SLP_DICT = {"Right Ankle": 0, "Right Knee": 1, "Right Hip": 2, "Left Hip": 3, "Left Knee": 4, "Left Ankle": 5, "Right Wrist": 6,
             "Right Elbow": 7, "Right Shoulder": 8, "Left Shoulder": 9, "Left Elbow": 10, "Left Wrist": 11, "Thorax": 12, "Head Top": 13}
 
 
@@ -14,18 +17,32 @@ def get_distance(lmk_from, lmk_to):
 
 
 def get_distance_by_name(pose, name_from, name_to):
-    lmk_from = pose[SLP_dict[name_from], :]
-    lmk_to = pose[SLP_dict[name_to], :]
+    lmk_from = pose[SLP_DICT[name_from], :]
+    lmk_to = pose[SLP_DICT[name_to], :]
     return get_distance(lmk_from, lmk_to)
 
 
 def get_center_points(pose, left_point, right_point):
-    left = pose[SLP_dict[left_point], :]
-    right = pose[SLP_dict[right_point], :]
+    left = pose[SLP_DICT[left_point], :]
+    right = pose[SLP_DICT[right_point], :]
     return left*0.5 + right*0.5
 
 
 def get_pose_size(pose, torso_size_multiplier=2.5):
+    """Get size of pose by measure distance from neck to middle of hip and multiple by 2.5
+
+    Parameters
+    ----------
+    pose : np.ndarray
+        pose as keypoints
+    torso_size_multiplier : float, optional
+        coefficient to multiple, by default 2.5
+
+    Returns
+    -------
+    np.ndarray
+        Pose size for normalization
+    """
     if isinstance(pose, torch.Tensor):
         pose = pose.cpu().detach().numpy()
 
@@ -44,6 +61,18 @@ def get_pose_size(pose, torso_size_multiplier=2.5):
 
 
 def normalize_pose(pose):
+    """Normalize pose using torso size
+
+    Parameters
+    ----------
+    pose : np.ndarray
+        Input keypoints
+
+    Returns
+    -------
+    np.ndarray
+        Normalized pose
+    """
     if isinstance(pose, torch.Tensor):
         pose = pose.cpu().detach().numpy()
     pose_center = get_center_points(pose, "Left Hip", "Right Hip")
@@ -69,6 +98,18 @@ def build_embedding_from_distance(pose):
 
 
 def pose_to_embedding_v1(pose):
+    """Get embedding vector from raw pose from HRNet (version 1)
+
+    Parameters
+    ----------
+    pose : np.ndarray or torch.Tensor
+        raw pose from HRNet
+
+    Returns
+    -------
+    torch.Tensor
+        Embedding vector
+    """
     if isinstance(pose, torch.Tensor):
         pose = pose.cpu().detach().numpy()
     reshaped_inputs = np.reshape(pose, (14, 2))
@@ -77,6 +118,18 @@ def pose_to_embedding_v1(pose):
 
 
 def pose_to_embedding_v2(pose):
+    """Get embedding vector from raw pose from HRNet (version 2)
+
+    Parameters
+    ----------
+    pose : np.ndarray or torch.Tensor
+        raw pose from HRNet
+
+    Returns
+    -------
+    torch.Tensor
+        Embedding vector
+    """
     if isinstance(pose, torch.Tensor):
         pose = pose.cpu().detach().numpy()
     reshaped_input = np.reshape(pose, (14, 2))
@@ -88,10 +141,36 @@ def pose_to_embedding_v2(pose):
 
 
 def load_config(path):
+    """Load JSON config from path
+
+    Parameters
+    ----------
+    path : str
+        path to JSON config
+
+    Returns
+    -------
+    dict or list
+        JSON object
+    """
     return json.load(open(path, "r"))
 
 
 def accuracy(outputs, labels):
+    """Calculate accuracy based on prediction and labels
+
+    Parameters
+    ----------
+    outputs : torch.Tensor or np.ndarray
+        prediction values
+    labels : torch.Tensor or np.ndarray
+        label values
+
+    Returns
+    -------
+    torch.Tensor
+        accuracy value
+    """
     _, preds = torch.max(outputs, dim=1)
     return torch.tensor(torch.sum(preds == labels).item()/len(preds))
 
@@ -101,6 +180,30 @@ def plot_confusion_matrix(y_true, y_pred, classes,
                           title=None,
                           cmap=plt.cm.Blues,
                           savepath="confusion_matrix.png"):
+    """Plot and save confusion matrix for evaluation phase
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        labels 
+    y_pred : np.ndarray
+        prediction
+    classes : list or np.ndarray
+        list of class names
+    normalize : bool, optional
+        normalized acc to [0,1] range, by default False
+    title : str, optional
+        title on image, by default None
+    cmap : tuple or list, optional
+        color map, by default plt.cm.Blues
+    savepath : str, optional
+        path to save confusion matrix as image, by default "confusion_matrix.png"
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     if not title:
         if normalize:
             title = 'Normalized confusion matrix'
@@ -147,16 +250,3 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 def visualize_keypoint(image, keypoint):
     pass
 
-
-def main():
-    sample_file = "../../../POSESLP/lying_right/000030.npy"
-    pose = np.load(sample_file)
-    # print(pose)
-    # print(pose.shape)
-    tensor = torch.from_numpy(np.transpose(pose, (1, 0)))
-    pose = pose_to_embedding(tensor)
-    print("Normalize pose: ", pose)
-
-
-if __name__ == "__main__":
-    main()

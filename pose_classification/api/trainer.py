@@ -10,9 +10,9 @@ import torch.nn.functional as F
 from torchvision.transforms import ToTensor
 import torch.utils.data.dataloader
 
-from model.model import PoseClassifierV1, model_gateway
-from data.data import NormalPoseDataset
-from utils.utils import load_config, accuracy
+from model.target_model import model_gateway
+from data.normal_dataset import NormalPoseDataset
+from utils.general import load_config, accuracy
 from utils.focal_loss import FocalLoss
 
 

@@ -27,13 +27,13 @@
             "linear_3": [512,3]
         }
     },
-    "weight": "./model/raw/best_acc_model.pth",
+    "weight": "./trained_model/raw/best_acc_model.pth",
     "device": 1,
     "test_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_left_test_list.txt",
     "test_dir": "../output/coco/pose_hrnet/w32_256x192_adam_lr1e-3/results/numpy_total/",
     "data_dir": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/",
     "model_name": "pose_classifier_v2.1",
     "comment": "If mode equal 1, use test_list for inference. If mode equal 2, use test_dir for inference",
-    "end2end": 0,
+    "end2end": 1,
     "mode": "all"
 }

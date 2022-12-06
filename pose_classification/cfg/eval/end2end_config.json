@@ -1,0 +1,32 @@
+{
+    "raw_model":{
+        "model_name": "PoseClassifierV2_1",
+        "model_config": "./cfg/model_config/pose_classifier_v2.1.json",
+        "weight": "./trained_model/raw/best_acc_model.pth"
+    },
+    "supine_model":{
+        "model_name": "PoseClassifierV2_1",
+        "model_config": "./cfg/model_config/pose_classifier_v2.1.json",
+        "weight": "./trained_model/sub_supine/best_acc_model.pth"
+    },
+    "lying_left_model":{
+        "model_name": "PoseClassifierV2_1",
+        "model_config": "./cfg/model_config/pose_classifier_v2.1.json",
+        "weight": "./trained_model/sub_lying_left/best_acc_model.pth"
+    },
+    "lying_right_model":{
+        "model_name": "PoseClassifierV2_2",
+        "model_config": "./cfg/model_config/pose_classifier_v2.2.json",
+        "weight": "./trained_model/sub_lying_right/best_acc_model.pth"
+    },
+    "data": {
+        "data_dir": "../output/coco/pose_hrnet/w32_256x192_adam_lr1e-3/results/numpy_total/",
+        "mapping_file": "./cfg/mapping.json",
+        "mode": "all"
+    },
+    "log": {
+        "log_verbose": true,
+        "output_path": "log.txt"
+    },
+    "device":"cuda:1"
+}

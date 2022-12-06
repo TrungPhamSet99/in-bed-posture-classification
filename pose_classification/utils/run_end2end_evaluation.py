@@ -1,30 +1,43 @@
+# -*- coding: utf-8 -*-
+# author: Trung Pham (EDABK lab - HUST)
+# description: Script define end2end evaluator for pose classification module
 import os
 import json
 import argparse
-from model import model_gateway, End2EndPoseClassifer
-from data import End2EndDataset
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import warnings
 from torchvision.transforms import ToTensor
-from utils import load_config, accuracy, pose_to_embedding_v1, plot_confusion_matrix, pose_to_embedding_v2
+
+from utils.general import load_config, accuracy, plot_confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.metrics import precision_recall_fscore_support as score
+from data.end2end_dataset import End2EndDataset
+from model.target_model import model_gateway, End2EndPoseClassifer
+from utils.logger import Logger
 
+warnings.filterwarnings('ignore')
 CLASSES = ["supine_0", "supine_1", "supine_2", "lying_left_0", "lying_left_1", "lying_left_2",
            "lying_right_0", "lying_right_1", "lying_righ_2"]
 
-
 class End2EndEvaluator:
     def __init__(self, config_path):
+        """Constructor for End2EndEvaluator
+
+        Parameters
+        ----------
+        config_path : str
+            path to JSON config file
+        """
         self.config = load_config(config_path)
-        model_config = self.config["model"]
+        # model_config = self.config["model"]
         for k in self.config.keys():
             if "_model" not in k:
                 continue
             setattr(self, k, model_gateway(
-                self.config[k]["model_name"], model_config))
-        # print(self.raw_model)
+                self.config[k]["model_name"], load_config(self.config[k]["model_config"])))
+        self.logger = Logger(self.config["log"]).logger
         self.end2end_evaluator = End2EndPoseClassifer(self.raw_model, self.supine_model,
                                                       self.lying_left_model, self.lying_right_model)
         self.test_dataset = End2EndDataset(self.config["data"]["data_dir"],
@@ -35,7 +48,10 @@ class End2EndEvaluator:
                                                       pin_memory=False)
 
     def initialize(self):
-        # Load weight for 4 model
+        """Initialize for evaluator
+        - Load weight for sub models
+        - Init device (cpu or gpu)
+        """
         for k in self.config:
             if "_model" not in k:
                 continue
@@ -48,6 +64,13 @@ class End2EndEvaluator:
             self.device = torch.device('cpu')
 
     def run(self):
+        """Run end2end evaluator on test set
+
+        Returns
+        -------
+        tuple
+            label, prediction
+        """
         label = []
         prediction = []
         for i, batch in enumerate(self.testloader):
@@ -76,7 +99,7 @@ def parse_argument():
     parser = argparse.ArgumentParser(
         "Run script to train pose classification model")
     parser.add_argument('--config-path', type=str,
-                        help='Path to training config file', default="./cfg/end2end_config.json")
+                        help='Path to training config file', default="./cfg/eval/end2end_config.json")
     return parser
 
 
@@ -90,11 +113,12 @@ def main():
 
     precision, recall, fscore, support = score(labels, prediction)
     report = classification_report(labels, prediction)
-    print('precision: {}'.format(precision))
-    print('recall: {}'.format(recall))
-    print('fscore: {}'.format(fscore))
-    print('support: {}'.format(support))
-    print(report)
+    logger = end2end.logger
+    logger.info('\nprecision: {}'.format(precision))
+    logger.info('\nrecall: {}'.format(recall))
+    logger.info('\nfscore: {}'.format(fscore))
+    logger.info('\nsupport: {}\n'.format(support))
+    logger.info(report)
 
     plot_confusion_matrix(labels, prediction, CLASSES, normalize=False, title="Non-normalized confusion matrix (all)",
                           savepath="Non_normalized_confusion_matrix.png")

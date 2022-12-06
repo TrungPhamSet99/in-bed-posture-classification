@@ -11,9 +11,9 @@ from torchvision.transforms import ToTensor
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.metrics import precision_recall_fscore_support as score
 
-from utils import load_config, accuracy, pose_to_embedding_v1, plot_confusion_matrix, pose_to_embedding_v2
-from model import model_gateway
-from data import NormalPoseDataset
+from utils.general import load_config, accuracy, plot_confusion_matrix, pose_to_embedding_v2
+from model.target_model import model_gateway
+# from data.data import NormalPoseDataset
 
 
 CLASSES = ["lying_left_0", "lying_left_1", "lying_left_2"]
@@ -43,14 +43,14 @@ class PosePredictor():
         """
         self._init_torch_tensor()
         self.model.load_state_dict(torch.load(self.weights))
-        if self.conf["model_name"] != "pose_classifier_v1" and not self.conf["end2end"]:
-            self.test_dataset = NormalPoseDataset(self.conf['data_dir'],
-                                                  self.conf['test_list'])
-            self.testloader = torch.utils.data.DataLoader(self.test_dataset, batch_size=32,
-                                                          shuffle=False, num_workers=4,
-                                                          pin_memory=False)
-        elif self.conf["model_name"] != "pose_classifier_v1" and self.conf["end2end"]:
-            pass
+        # if self.conf["model_name"] != "pose_classifier_v1" and not self.conf["end2end"]:
+        #     self.test_dataset = NormalPoseDataset(self.conf['data_dir'],
+        #                                           self.conf['test_list'])
+        #     self.testloader = torch.utils.data.DataLoader(self.test_dataset, batch_size=32,
+        #                                                   shuffle=False, num_workers=4,
+        #                                                   pin_memory=False)
+        # elif self.conf["model_name"] != "pose_classifier_v1" and self.conf["end2end"]:
+        #     pass
         self.model.eval()
 
     def _init_torch_tensor(self):
@@ -61,6 +61,45 @@ class PosePredictor():
             self.device = torch.device("cuda:1")
         else:
             self.device = torch.device('cpu')
+    
+    @staticmethod
+    def _validate_input_data(input_data):
+        assert isinstance(input_data, (np.ndarray, torch.Tensor)), f"Only support np.ndarray or torch.Tensor but got {type(input_data)} as input"
+    
+    def _preprocess(self, input_data):
+        """Preprocess input data before execute prediction
+
+        Parameters
+        ----------
+        input_data : np.ndarray or torch.Tensor
+            Input keypoints
+        """
+        if isinstance(input_data, torch.Tensor):
+            input_data = input_data.numpy()
+        return pose_to_embedding_v2(input_data).unsqueeze(0)
+    
+    def _postprocess(self, input_data):
+        """Postprocess DNN output for final prediction
+
+        Parameters
+        ----------
+        input_data : torch.Tensor
+            DNN model output
+        """
+        return torch.argmax(input_data).numpy()
+
+    def execute(self, input_data):
+        """Execute prediction on input data
+
+        Parameters
+        ----------
+        input_data : _type_
+            _description_
+        """
+        self._validate_input_data(input_data)
+        input_data = self._preprocess(input_data)
+        dnn_output = self.model(input_data, self.device)
+        return self._postprocess(dnn_output)
 
     # def predict_numpy_ver1(self, input_sample):
     #     c = input_sample.split("/")[-2]
@@ -97,42 +136,27 @@ class PosePredictor():
     #     output = self.model(pose, self.device)
     #     return torch.argmax(output).numpy(), CLASSES.index(c)
 
-    def execute(self):
-        """Execute evaluation on test set
+    # def execute(self):
+    #     """Execute evaluation on test set
 
-        Returns
-        -------
-        tuple
-            (labels, prediction)
-        """
-        label = []
-        prediction = []
-        for batch in self.testloader:
-            poses, labels = batch
-            output = self.model(poses, self.device)
-            output = torch.argmax(output, axis=1).numpy()
-            labels = labels.numpy()
-            label += labels.tolist()
-            prediction += output.tolist()
+    #     Returns
+    #     -------
+    #     tuple
+    #         (labels, prediction)
+    #     """
+    #     label = []
+    #     prediction = []
+    #     for batch in self.testloader:
+    #         poses, labels = batch
+    #         output = self.model(poses, self.device)
+    #         output = torch.argmax(output, axis=1).numpy()
+    #         labels = labels.numpy()
+    #         label += labels.tolist()
+    #         prediction += output.tolist()
 
-        return label, prediction
+    #     return label, prediction
 
 
-def parse_argument():
-    """
-    Parse arguments from command line
-
-    Returns
-    -------
-    ArgumentParser
-        Object for argument parser
-
-    """
-    parser = argparse.ArgumentParser(
-        "Run script to train pose classification model")
-    parser.add_argument('--config-path', type=str,
-                        help='Path to training config file', default="./cfg/predict_config.json")
-    return parser
 
 
 def main():
