@@ -1,38 +1,11 @@
 {
-    "model":{
-        "pose_classifier_v1":{
-            "linear1": [28, 128],
-            "linear2": [128, 64],       
-            "linear3": [64, 32],
-            "linear4": [32, 3]
-        },
-        "pose_classifier_v2.1":{
-            "conv1d_1": [2, 16, 5],
-            "conv1d_2": [16, 32, 5],
-            "conv1d_3": [32, 64, 3],
-            "conv1d_4": [64, 128, 3],
-            "conv1d_5": [128, 256, 3],
-            "linear_1": [2048, 1024],
-            "linear_2": [1024, 512],
-            "linear_3": [512,3]
-        },
-        "pose_classifier_v2.2":{
-            "conv1d_1": [2, 16, 3],
-            "conv1d_2": [16, 32, 3],
-            "conv1d_3": [32, 64, 3],
-            "conv1d_4": [64, 128, 3],
-            "conv1d_5": [128, 256, 3],
-            "linear_1": [3072, 1024],
-            "linear_2": [1024, 512],
-            "linear_3": [512,3]
-        }
-    },
     "weight": "./trained_model/raw/best_acc_model.pth",
     "device": 1,
     "test_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_left_test_list.txt",
     "test_dir": "../output/coco/pose_hrnet/w32_256x192_adam_lr1e-3/results/numpy_total/",
     "data_dir": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/",
-    "model_name": "pose_classifier_v2.1",
+    "model_name": "PoseClassifierV2_1",
+    "model_config": "./cfg/model_config/pose_classifier_v2.1.json",
     "comment": "If mode equal 1, use test_list for inference. If mode equal 2, use test_dir for inference",
     "end2end": 1,
     "mode": "all"

@@ -12,30 +12,8 @@ import torch.utils.data.dataloader
 
 from model.target_model import model_gateway
 from data.normal_dataset import NormalPoseDataset
-from utils.general import load_config, accuracy
+from utils.general import load_config, accuracy, colorstr
 from utils.focal_loss import FocalLoss
-
-
-def parse_argument():
-    """
-    Parse arguments from command line
-
-    Returns
-    -------
-    ArgumentParser
-        Object for argument parser
-
-    """
-    parser = argparse.ArgumentParser(
-        "Run script to train pose classification model")
-    parser.add_argument('--config-path', type=str,
-                        help='Path to training config file', default="./cfg/train_config.json")
-    return parser
-
-
-def init_weights(m):
-    if type(m) in [nn.Module, nn.Linear, nn.Conv1d]:
-        nn.init.xavier_uniform(m.weight)
 
 
 class PoseTrainer():
@@ -50,11 +28,11 @@ class PoseTrainer():
         """
         self.config = load_config(config_path)
         self.data_config = self.config['data']
-        self.model_config = self.config['model']
+        self.model_config = load_config(self.config['model_config'])
         self.optim_config = self.config['optimizer']
         self.training_config = self.config['training']
 
-        self.model = model_gateway(self.config)
+        self.model = model_gateway(self.config["model_name"], self.model_config)
         self.train_dataset = NormalPoseDataset(self.data_config['data_dir'],
                                                self.data_config['train_list'],
                                                augment_config_path=self.data_config['augmentation_config_path'])
@@ -75,7 +53,10 @@ class PoseTrainer():
         ValueError
             Raise ValueError if config for optimizer is not SGD
         """
-        self.model.apply(init_weights)
+        print(colorstr("optimizer hyperparameter:\n") + ', '.join(f'{k}: {v}'for k, v in self.config['optimizer'].items()))
+        print(colorstr(f"Number sample for training set: {len(self.train_dataset)}"))
+        print(colorstr(f"Number sample for test set: {len(self.test_dataset)}"))
+        self.model.apply(self.init_weights)
         self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
                                                        batch_size=self.data_config['batch_size'],
                                                        shuffle=self.data_config['shuffle'],
@@ -102,6 +83,12 @@ class PoseTrainer():
         if not os.path.exists(self.training_config['output_dir']):
             os.makedirs(self.training_config['output_dir'], exist_ok=True)
         print("Successfully init trainer")
+        
+    
+    @staticmethod
+    def init_weights(m):
+        if type(m) in [nn.Module, nn.Linear, nn.Conv1d]:
+            nn.init.xavier_uniform(m.weight)
 
     def run_train(self):
         """
@@ -244,17 +231,3 @@ class PoseTrainer():
             self.training_config['output_dir'], model_name)
         torch.save(self.model.state_dict(), save_path)
 
-
-def main():
-    parser = parse_argument()
-    args = parser.parse_args()
-
-    trainer = PoseTrainer(args.config_path)
-    trainer.initialize()
-    loss_report = trainer.run_train()
-    # with open("loss_report.json", "w") as f:
-    #     json.dump({"loss_report": loss_report}, f)
-
-
-if __name__ == "__main__":
-    main()

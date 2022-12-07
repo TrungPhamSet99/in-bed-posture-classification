@@ -5,7 +5,7 @@
 import numpy as np
 import json
 import random
-from utils import load_config
+from utils.general import load_config
 import os
 
 random.seed(10)
