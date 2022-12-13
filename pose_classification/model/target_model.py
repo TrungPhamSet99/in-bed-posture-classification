@@ -7,7 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import json
 import numpy as np
-from model.base_model import BasePoseClassifier
+from model.base_model import BasePoseClassifier, EnDeCoder, BottleNeckAE
+from utils.general import load_config
 
 class PoseClassifierV1(BasePoseClassifier):
     def __init__(self, config, model_name):
@@ -256,6 +257,24 @@ class End2EndPoseClassifer(nn.Module):
         # Convert 3 classes label to 9 classes label and return output
         return (raw_pred*3) + final_output + 1
 
+class AutoEncoderV1(nn.Module):
+    def __init__(self, config, training=True):
+        super(AutoEncoderV1, self).__init__()
+        self.config = load_config(config)
+        self.encoder = EnDeCoder(self.config["Encoder"])
+        self.decoder = EnDeCoder(self.config["Decoder"])
+        self.bottleneck = BottleNeckAE(self.config["Bottleneck"], training)
+
+    def forward(self, inputs, device, **kwargs):
+        inputs = inputs.float()
+        inputs.to(device)
+        inputs = self.encoder(inputs)
+        if self.training:
+            return self.decoder(self.bottleneck(inputs))
+        else:
+            return self.bottleneck(inputs)
+
+
 
 def model_gateway(model_name, model_config):
     """Gateway to get model instance from config
@@ -282,3 +301,5 @@ def model_gateway(model_name, model_config):
     except:
         raise ValueError(f"Do not support {model_name} in this version, please check your config again")
     return model(model_config, model_name)
+
+

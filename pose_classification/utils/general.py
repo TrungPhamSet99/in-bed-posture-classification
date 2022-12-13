@@ -5,7 +5,9 @@ import torch
 import os
 import numpy as np
 import json
+import yaml
 import matplotlib.pyplot as plt
+import pathlib
 from sklearn.metrics import confusion_matrix
 
 SLP_DICT = {"Right Ankle": 0, "Right Knee": 1, "Right Hip": 2, "Left Hip": 3, "Left Knee": 4, "Left Ankle": 5, "Right Wrist": 6,
@@ -141,19 +143,25 @@ def pose_to_embedding_v2(pose):
 
 
 def load_config(path):
-    """Load JSON config from path
+    """Load JSON or yaml config from path
 
     Parameters
     ----------
     path : str
-        path to JSON config
+        path to JSON or yaml config
 
     Returns
     -------
     dict or list
         JSON object
     """
-    return json.load(open(path, "r"))
+    if pathlib.Path(path).suffix == ".json":
+        return json.load(open(path, "r"))
+    elif pathlib.Path(path).suffix == ".yaml":
+        return yaml.safe_load(open(path, "r"))
+    else:
+        raise ValueError(f"Do not support config as {pathlib.Path(path).suffix} format")
+
 
 
 def accuracy(outputs, labels):
@@ -249,7 +257,6 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 
 def visualize_keypoint(image, keypoint):
     pass
-
 
 def colorstr(*input_):
     # Colors a string https://en.wikipedia.org/wiki/ANSI_escape_code, i.e.  colorstr('blue', 'hello world')

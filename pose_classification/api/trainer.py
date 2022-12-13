@@ -33,13 +33,14 @@ class PoseTrainer():
         self.training_config = self.config['training']
 
         self.model = model_gateway(self.config["model_name"], self.model_config)
-        self.train_dataset = NormalPoseDataset(self.data_config['data_dir'],
+        dataset = eval(self.data_config["dataset_name"])
+        self.train_dataset = dataset(self.data_config['data_dir'],
                                                self.data_config['train_list'],
                                                augment_config_path=self.data_config['augmentation_config_path'])
-        self.test_dataset = NormalPoseDataset(self.data_config['data_dir'],
+        self.test_dataset = dataset(self.data_config['data_dir'],
                                               self.data_config['test_list'])
         self.device = self.config["device"]
-        self.loss_calculate = FocalLoss()
+        self.loss_calculate = eval(self.config["loss"])()
         self.trainloader = None
         self.testloader = None
         self.optimizer = None
@@ -142,11 +143,7 @@ class PoseTrainer():
             Loss value
         """
         inputs, labels = batch
-        # print(inputs.shape)
         out = self.model(inputs, self.device)
-        # print(f"Train output: {out}")
-        # print(f"Train label: {labels}")
-        # loss = F.cross_entropy(out, labels)
         loss = self.loss_calculate(out, labels)
         return loss
 
@@ -165,7 +162,6 @@ class PoseTrainer():
         """
         inputs, labels = batch
         out = self.model(inputs, self.device)
-        # loss = F.cross_entropy(out, labels)
         loss = self.loss_calculate(out, labels)
         acc = accuracy(out, labels)
         return {'val_loss': loss, 'val_acc': acc}
@@ -230,4 +226,3 @@ class PoseTrainer():
         save_path = os.path.join(
             self.training_config['output_dir'], model_name)
         torch.save(self.model.state_dict(), save_path)
-

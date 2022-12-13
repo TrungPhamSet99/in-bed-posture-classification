@@ -8,6 +8,7 @@
         "lr_factor": 0.1
     },
     "data": {
+        "dataset_name": "NormalPoseDataset",
         "data_dir": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/",
         "train_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_right_train_list.txt",
         "test_list": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/lying_right_test_list.txt",
@@ -25,5 +26,6 @@
     },
     "device":"cuda:1",
     "model_name": "PoseClassifierV2_2",
-    "model_config": "./cfg/model_config/pose_classifier_v2.2.json"
+    "model_config": "./cfg/model_config/pose_classifier_v2.2.json",
+    "loss": "FocalLoss"
 }
