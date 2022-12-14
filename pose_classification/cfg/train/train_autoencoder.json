@@ -1,0 +1,33 @@
+{
+    "optimizer":{
+        "name": "SGD",
+        "lr": 0.005,
+        "momentum": 0.9,
+        "weight_decay": 0.0001,
+        "lr_step": [300,500],
+        "lr_factor": 0.1
+    },
+    "data": {
+        "dataset_name": "AutoEncoderDataset",
+        "data_dir": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/",
+        "train_list": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/sub_train_list.txt",
+        "test_list": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/test_list.txt",
+        "batch_size": 1,
+        "shuffle": true,
+        "num_workers": 0,
+        "pin_memory": false,
+        "train_transform": "ToTensor",
+        "test_transform": "ToTensor",
+        "augmentation_config_path": null
+    },
+    "training": {
+        "epoch": 2000,
+        "output_dir": "./autoencoder_v1/",
+        "saving_interval": 50,
+        "loss_report_path": "loss_report.json"
+    },
+    "device":"cuda:0",
+    "model_name": "AutoEncoderV1",
+    "model_config": "./cfg/model_config/autoencoder_v1.yaml",
+    "loss": "nn.MSELoss"
+}

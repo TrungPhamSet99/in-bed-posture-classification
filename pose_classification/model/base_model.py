@@ -87,7 +87,7 @@ class EnDeCoder(nn.Module):
         list
             list of nn.Module
         """
-        module_list = []
+        module_list = nn.ModuleList()
         for idx in tqdm(range(len(config)), desc=colorstr("Parsing module list from config")):
             element = config[idx]
             module_name, params = element[0], element[1:]
@@ -95,7 +95,7 @@ class EnDeCoder(nn.Module):
             module_list.append(module(*params))
         return module_list
     
-    def forward(self, inputs, **kwargs):
+    def forward(self, inputs, device, **kwargs):
         """Forward implementation as Sequential model
 
         Parameters
@@ -108,9 +108,17 @@ class EnDeCoder(nn.Module):
         torch.Tensor
             Output tensor
         """
+        inputs = inputs.float()
+        inputs.to(device)
         for module in self.module_list:
             inputs = module(inputs)
         return inputs 
+    
+    def parameters(self, only_trainable=True):
+        for param in self.module_list.parameters():
+            if only_trainable and not param.requires_grad:
+                continue
+            yield param
 
 
 class BottleNeckAE(nn.Module):
@@ -127,13 +135,13 @@ class BottleNeckAE(nn.Module):
             True if model work in training mode, by default False
         """
         super(BottleNeckAE, self).__init__()
-        self.module_list = []
+        self.module_list = nn.ModuleList()
         self.training = training
         for element in config:
             module = eval(f"nn.{element[0]}")
             self.module_list.append(module(*element[1:]))
     
-    def forward(self, inputs, **kwargs):
+    def forward(self, inputs, device,**kwargs):
         """Forward implementation
             If model is in training mode, take output from the last module in bottleneck
             Else just take output from the first module in bottleneck
@@ -147,6 +155,8 @@ class BottleNeckAE(nn.Module):
         torch.Tensor
             Output tensor
         """
+        inputs = inputs.float()
+        inputs.to(device)
         outputs = []
         for module in self.module_list:
             inputs = module(inputs)
@@ -155,3 +165,9 @@ class BottleNeckAE(nn.Module):
             return outputs[-1]
         else:
             return outputs[0]
+
+    def parameters(self, only_trainable=True):
+        for param in self.module_list.parameters():
+            if only_trainable and not param.requires_grad:
+                continue
+            yield param

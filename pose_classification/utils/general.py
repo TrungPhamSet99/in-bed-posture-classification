@@ -155,10 +155,13 @@ def load_config(path):
     dict or list
         JSON object
     """
-    if pathlib.Path(path).suffix == ".json":
+    if isinstance(path, dict):
+        return path
+    elif pathlib.Path(path).suffix == ".json":
         return json.load(open(path, "r"))
     elif pathlib.Path(path).suffix == ".yaml":
         return yaml.safe_load(open(path, "r"))
+    
     else:
         raise ValueError(f"Do not support config as {pathlib.Path(path).suffix} format")
 

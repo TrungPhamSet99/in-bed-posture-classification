@@ -268,15 +268,20 @@ class AutoEncoderV1(nn.Module):
     def forward(self, inputs, device, **kwargs):
         inputs = inputs.float()
         inputs.to(device)
-        inputs = self.encoder(inputs)
+        inputs = self.encoder(inputs, device)
         if self.training:
-            return self.decoder(self.bottleneck(inputs))
+            return self.decoder(self.bottleneck(inputs, device), device)
         else:
-            return self.bottleneck(inputs)
+            return self.bottleneck(inputs, device)
+    
+    def parameter(self, only_trainable=True):
+        return [self.encoder.parameters(only_trainable),
+                self.bottleneck.parameters(only_trainable),
+                self.decoder.parameters(only_trainable)]
 
 
 
-def model_gateway(model_name, model_config):
+def model_gateway(model_name, model_config, training=True):
     """Gateway to get model instance from config
 
     Parameters
@@ -300,6 +305,9 @@ def model_gateway(model_name, model_config):
         model = eval(model_name)
     except:
         raise ValueError(f"Do not support {model_name} in this version, please check your config again")
-    return model(model_config, model_name)
+    if "AutoEncoder" in model_name:
+        return model(model_config, training)
+    else:
+        return model(model_config, model_name)
 
 

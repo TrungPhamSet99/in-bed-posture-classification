@@ -34,6 +34,7 @@ class NormalPoseDataset(Dataset):
             self.data_paths = [ele.rstrip() for ele in self.data_paths]
         elif isinstance(list_path, list):
             self.data_paths = list_path
+
         if "supine" in self.data_list_path:
             self.classes = ["1", "2", "3"]
         elif "lying_left" in self.data_list_path:
@@ -42,10 +43,12 @@ class NormalPoseDataset(Dataset):
             self.classes = ["7", "8", "9"]
         else:
             self.classes = ["lying_left", "supine", "lying_right"]
+
         if augment_config_path is not None:
             self.augmentor = PoseAugmentor(augment_config_path)
         else:
             self.augmentor = None
+        
 
     def __len__(self):
         """Get length of dataset
@@ -74,7 +77,11 @@ class NormalPoseDataset(Dataset):
         c = path.split("/")[-2]
         fp = os.path.join(self.data_root, path)
         pose = np.load(fp)
+        # Apply augmentation
         if self.augmentor is not None:
             pose = self.augmentor.augment(pose)
+        # Apply transform
+        if self.transform is not None:
+            pose = self.transform(pose)
         embedding = pose_to_embedding_v2(pose)
         return embedding, self.classes.index(c)

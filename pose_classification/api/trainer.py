@@ -7,16 +7,18 @@ import numpy as np
 import argparse
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose
 import torch.utils.data.dataloader
 
 from model.target_model import model_gateway
+from model.base_module import ConvBlock, TransposeConvBlock
 from data.normal_dataset import NormalPoseDataset
+from data.autoencoder_dataset import AutoEncoderDataset
 from utils.general import load_config, accuracy, colorstr
 from utils.focal_loss import FocalLoss
 
 
-class PoseTrainer():
+class PoseTrainer:
     def __init__(self, config_path):
         """
         Init trainer class
@@ -35,11 +37,12 @@ class PoseTrainer():
         self.model = model_gateway(self.config["model_name"], self.model_config)
         dataset = eval(self.data_config["dataset_name"])
         self.train_dataset = dataset(self.data_config['data_dir'],
-                                               self.data_config['train_list'],
-                                               augment_config_path=self.data_config['augmentation_config_path'])
+                                     self.data_config['train_list'],
+                                     augment_config_path=self.data_config['augmentation_config_path'],
+                                     transform = Compose([eval(self.data_config["train_transform"])()]))
         self.test_dataset = dataset(self.data_config['data_dir'],
-                                              self.data_config['test_list'])
-        self.device = self.config["device"]
+                                    self.data_config['test_list'],
+                                    transform = Compose([eval(self.data_config["test_transform"])()]))
         self.loss_calculate = eval(self.config["loss"])()
         self.trainloader = None
         self.testloader = None
@@ -83,8 +86,17 @@ class PoseTrainer():
 
         if not os.path.exists(self.training_config['output_dir']):
             os.makedirs(self.training_config['output_dir'], exist_ok=True)
+        self._init_torch_tensor()
         print("Successfully init trainer")
-        
+    
+    def _init_torch_tensor(self):
+        """Init torch tensor for device
+        """
+        torch.set_default_tensor_type('torch.FloatTensor')
+        if torch.cuda.is_available():
+            self.device = torch.device(self.config["device"])
+        else:
+            self.device = torch.device('cpu')
     
     @staticmethod
     def init_weights(m):
@@ -105,7 +117,7 @@ class PoseTrainer():
         best_lost = np.inf
         best_acc = -np.inf
         for epoch in range(self.training_config['epoch']):
-            print("-----------------{} epoch-----------------".format(epoch))
+            print("-----------------Epoch {}-----------------".format(epoch))
             if not epoch % self.training_config['saving_interval']:
                 model_name = "{}_epoch.pth".format(epoch)
                 # self.save_model(model_name)
