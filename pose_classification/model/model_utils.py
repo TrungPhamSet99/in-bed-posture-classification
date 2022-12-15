@@ -48,3 +48,27 @@ def autopad(k, p=None, d=1):
     if p is None:
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
+
+def initialize_weights(model):
+    for m in model.modules():
+        t = type(m)
+        if t is nn.Conv2d:
+            pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        elif t is nn.BatchNorm2d:
+            m.eps = 1e-3
+            m.momentum = 0.03
+        elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
+            m.inplace = True
+
+def count_params(model):
+    """Count parameters of model (total and just trainable)
+
+    Parameters
+    ----------
+    model : nn.Mopdule
+        Pytorch model as nn.Module
+    """
+    total_params = sum(param.numel() for param in model.parameters())
+    trainable_pararms = sum(param.numel() for param in model.parameters() if param.requires_grad)
+
+    return total_params, trainable_pararms

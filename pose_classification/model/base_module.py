@@ -31,7 +31,6 @@ class ConvBlock(nn.Module):
             Option to use shortcut connection, by default False
         """
         super(ConvBlock, self).__init__()
-        assert output_channels >= input_channels, "Output channels should greater than input channels in Conv2D, Check your config again"
         self.conv = nn.Conv2d(input_channels, output_channels, kernel_size,
                               stride, utils.autopad(kernel_size, padding), bias=False)
         self.bn = BatchNorm2D(output_channels) 
@@ -132,14 +131,44 @@ class BatchNorm2D(nn.Module):
 
 class UpSample(nn.Module):
     def __init__(self, scale_factor, mode="nearest"):
+        """Wrapper for Upsample module
+
+        Parameters
+        ----------
+        scale_factor : int
+            Factor for upsampling
+        mode : str, optional
+            Mode to upsample, by default "nearest"
+        """
         super(UpSample, self).__init__()
         self.upsample = nn.Upsample(scale_factor=scale_factor, mode=mode)
         
     def forward(self, inputs, **kwargs):
+        """Forward implementation
+
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor
+        """
         return self.upsample(inputs)
 
 class MaxPool(nn.Module):
     def __init__(self, kernel_size, stride):
+        """Wrapper for Max Pooling
+
+        Parameters
+        ----------
+        kernel_size : int 
+            Size for kernel in pooling
+        stride : int
+            Stride valuen in pooling
+        """
         super(MaxPool, self).__init__()
         self.pool = nn.MaxPool2d(kernel_size, stride) 
     
@@ -187,8 +216,59 @@ class ReShape(nn.Module):
 
 class ZeroPad(nn.Module):
     def __init__(self, size):
+        """Wrapper for zero padding module
+
+        Parameters
+        ----------
+        size : int
+            Size of padding region
+        """
         super(ZeroPad, self).__init__()
         self.pad = nn.ZeroPad2d(size)
 
     def forward(self, inputs, **kwargs):
         return self.pad(inputs)
+
+class ConvBottleneck(nn.Module):
+    def __init__(self, input_channels, output_channels, compress_ratio, shortcut=True):
+        """Constructor for bottlecneck module in autoencoder
+
+        Parameters
+        ----------
+        input_channels : int
+            Number channels of input tensor
+        output_channels : int
+            Number channels of output tensor
+        compress_ratio : float 
+            Ratio to calculate bottleneck size 
+        shortcut : bool, optional
+            Option to use shortcut connection, by default True
+        """
+        super(ConvBottleneck, self).__init__()
+        assert input_channels == output_channels, "Input channels should be equal output channels in bottleneck module"
+        assert compress_ratio < 1, "Compress ratio must < 1"
+        botlleneck_size = int(input_channels * compress_ratio)
+        self.conv1 = ConvBlock(input_channels, botlleneck_size, 1, 1)
+        self.conv2 = ConvBlock(botlleneck_size, output_channels, 3, 1)
+        self.shortcut = shortcut
+
+    def forward(self, inputs, training=False, **kwargs):
+        """Forward implementation
+
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor
+        """
+        if training:
+            if self.shortcut:
+                return inputs + self.conv2(self.conv1(inputs))
+            else:
+                return self.conv2(self.conv1(inputs))
+        else:
+            return self.conv1(inputs)

@@ -50,6 +50,8 @@ class PosePredictor():
         torch.set_default_tensor_type('torch.FloatTensor')
         if torch.cuda.is_available():
             self.device = torch.device("cuda:1")
+            # Move model to GPU 
+            self.model = self.model.to(self.device)
         else:
             self.device = torch.device('cpu')
     

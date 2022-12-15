@@ -33,25 +33,22 @@ class AutoEncoderDataset(Dataset):
 
         if not self.data_list:
             self.data_list = [os.path.join(self.data_dir, path) for path in os.listdir(str(self.data_dir))]
-        # self.data_samples = []
-        # for idx in tqdm(range(len(self.data_list)), desc="Building dataset"):
-        #     fp = self.data_list[idx]
-        #     image = cv2.imread(fp)
-        #     image = cv2.resize(image, (120,120))
-        #     # image = np.transpose(image, (2,0,1)) # Convert (W,H,C) -> (C,W,H)
-        #     # Use transform.ToTensor() to make transpose and convert image to torch.Tensor
-        #     # Reference: https://pytorch.org/vision/stable/generated/torchvision.transforms.ToTensor.html
-        #     self.data_samples.append(image)
+        self.data_samples = []
+        for idx in tqdm(range(len(self.data_list)), desc="Building dataset"):
+            fp = self.data_list[idx]
+            image = cv2.imread(fp)
+            image = cv2.resize(image, (120,120))
+            # image = np.transpose(image, (2,0,1)) # Convert (W,H,C) -> (C,W,H)
+            # Use transform.ToTensor() to make transpose and convert image to torch.Tensor
+            # Reference: https://pytorch.org/vision/stable/generated/torchvision.transforms.ToTensor.html
+            self.data_samples.append(image)
 
 
     def __len__(self):
         return len(self.data_list)
 
     def __getitem__(self, idx):
-        fp = self.data_list[idx]
-        sample = cv2.imread(fp)
-        sample = cv2.resize(sample, (120,120))
-        # sample = self.data_samples[idx]
+        sample = self.data_samples[idx]
         if self.transform:
             sample = self.transform(sample)
         return sample, sample

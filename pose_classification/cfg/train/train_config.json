@@ -26,6 +26,7 @@
         "saving_interval": 50,
         "loss_report_path": "loss_report.json"
     },
+    "metric": ["loss", "acc"],
     "device":"cuda:1",
     "model_name": "PoseClassifierV2_2",
     "model_config": "./cfg/model_config/pose_classifier_v2.2.json",

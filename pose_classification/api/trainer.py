@@ -7,11 +7,13 @@ import numpy as np
 import argparse
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 from torchvision.transforms import ToTensor, Compose
 import torch.utils.data.dataloader
-
+import itertools
 from model.target_model import model_gateway
 from model.base_module import ConvBlock, TransposeConvBlock
+from model.model_utils import count_params
 from data.normal_dataset import NormalPoseDataset
 from data.autoencoder_dataset import AutoEncoderDataset
 from utils.general import load_config, accuracy, colorstr
@@ -33,8 +35,13 @@ class PoseTrainer:
         self.model_config = load_config(self.config['model_config'])
         self.optim_config = self.config['optimizer']
         self.training_config = self.config['training']
-
+        self.metric_config = self.config["metric"]
+        # Get model from config
         self.model = model_gateway(self.config["model_name"], self.model_config)
+        total_params, trainable_params = count_params(self.model)
+        print(colorstr("Total params: "), total_params)
+        print(colorstr("Trainable params: "), trainable_params)
+
         dataset = eval(self.data_config["dataset_name"])
         self.train_dataset = dataset(self.data_config['data_dir'],
                                      self.data_config['train_list'],
@@ -95,13 +102,14 @@ class PoseTrainer:
         torch.set_default_tensor_type('torch.FloatTensor')
         if torch.cuda.is_available():
             self.device = torch.device(self.config["device"])
+            self.model = self.model.to(self.device)
         else:
             self.device = torch.device('cpu')
     
     @staticmethod
     def init_weights(m):
         if type(m) in [nn.Module, nn.Linear, nn.Conv1d]:
-            nn.init.xavier_uniform(m.weight)
+                nn.init.xavier_uniform(m.weight)
 
     def run_train(self):
         """
@@ -117,24 +125,25 @@ class PoseTrainer:
         best_lost = np.inf
         best_acc = -np.inf
         for epoch in range(self.training_config['epoch']):
-            print("-----------------Epoch {}-----------------".format(epoch))
             if not epoch % self.training_config['saving_interval']:
                 model_name = "{}_epoch.pth".format(epoch)
-                # self.save_model(model_name)
-            for batch in self.trainloader:
+            for i, batch in enumerate(tqdm(self.trainloader, desc=f"Epoch {epoch}")):
+                self.optimizer.zero_grad(set_to_none=True)
                 loss = self.train_step(batch)
+                loss = torch.mean(loss)
                 loss.backward()
                 self.optimizer.step()
-                self.optimizer.zero_grad()
+                
             result = self.evaluate(self.testloader)
             self.epoch_end(epoch, result)
             loss_report.append(result)
             if result['val_loss'] < best_lost:
                 best_lost = result["val_loss"]
                 self.save_model("best_loss_model.pth")
-            if result['val_acc'] > best_acc:
-                best_acc = result["val_acc"]
-                self.save_model("best_acc_model.pth")
+            if "acc" in self.metric_config:
+                if result['val_acc'] > best_acc:
+                    best_acc = result["val_acc"]
+                    self.save_model("best_acc_model.pth")
 
         self.save_model("final.pth")
         with open(os.path.join(self.training_config['output_dir'], self.training_config["loss_report_path"]), "w") as f:
@@ -155,6 +164,9 @@ class PoseTrainer:
             Loss value
         """
         inputs, labels = batch
+        if torch.cuda.is_available():
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
         out = self.model(inputs, self.device)
         loss = self.loss_calculate(out, labels)
         return loss
@@ -173,10 +185,17 @@ class PoseTrainer:
             {val loss, val acc}
         """
         inputs, labels = batch
+        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
         out = self.model(inputs, self.device)
         loss = self.loss_calculate(out, labels)
-        acc = accuracy(out, labels)
-        return {'val_loss': loss, 'val_acc': acc}
+        if "acc" in self.metric_config:
+            acc = accuracy(out, labels)
+            return {'val_loss': loss, 'val_acc': acc}
+        else:
+            return {'val_loss': loss}
 
     def validation_epoch_end(self, outputs):
         """Calculate everage loss and acc on validation dataset
@@ -193,9 +212,12 @@ class PoseTrainer:
         """
         batch_losses = [x['val_loss'] for x in outputs]
         epoch_loss = torch.stack(batch_losses).mean()
-        batch_accs = [x['val_acc'] for x in outputs]
-        epoch_acc = torch.stack(batch_accs).mean()
-        return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
+        if "acc" in self.metric_config:
+            batch_accs = [x['val_acc'] for x in outputs]
+            epoch_acc = torch.stack(batch_accs).mean()
+            return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
+        else:
+            return {'val_loss': epoch_loss.item()}
 
     def evaluate(self, dataloader):
         """Evaluate model on a dataset
@@ -223,8 +245,11 @@ class PoseTrainer:
         result : dict
             a dict contain result (acc and loss)
         """
-        print("Epoch [{}], val_loss: {:.4f}, val_acc: {:.4f}".format(
-            epoch, result['val_loss'], result['val_acc']))
+        if "acc" in self.metric_config:
+            print("Epoch [{}], val_loss: {:.4f}, val_acc: {:.4f}".format(
+                epoch, result['val_loss'], result['val_acc']))
+        else:
+            print("Epoch [{}], val_loss: {:.4f}".format(epoch, result['val_loss']))
 
     def save_model(self, model_name):
         """Save model as .pth file

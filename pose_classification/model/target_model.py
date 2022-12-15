@@ -266,20 +266,12 @@ class AutoEncoderV1(nn.Module):
         self.bottleneck = BottleNeckAE(self.config["Bottleneck"], training)
 
     def forward(self, inputs, device, **kwargs):
-        inputs = inputs.float()
-        inputs.to(device)
-        inputs = self.encoder(inputs, device)
+        inputs = self.encoder(inputs)
         if self.training:
-            return self.decoder(self.bottleneck(inputs, device), device)
+            return self.decoder(self.bottleneck(inputs))
         else:
-            return self.bottleneck(inputs, device)
+            return self.bottleneck(inputs)
     
-    def parameter(self, only_trainable=True):
-        return [self.encoder.parameters(only_trainable),
-                self.bottleneck.parameters(only_trainable),
-                self.decoder.parameters(only_trainable)]
-
-
 
 def model_gateway(model_name, model_config, training=True):
     """Gateway to get model instance from config
