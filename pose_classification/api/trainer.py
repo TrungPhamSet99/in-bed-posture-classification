@@ -11,6 +11,7 @@ from tqdm import tqdm
 from torchvision.transforms import ToTensor, Compose
 import torch.utils.data.dataloader
 import itertools
+from torch.utils.tensorboard import SummaryWriter
 from model.target_model import model_gateway
 from model.base_module import ConvBlock, TransposeConvBlock
 from model.model_utils import count_params
@@ -20,7 +21,7 @@ from utils.general import load_config, accuracy, colorstr
 from utils.focal_loss import FocalLoss
 
 
-class PoseTrainer:
+class Trainer:
     def __init__(self, config_path):
         """
         Init trainer class
@@ -49,6 +50,7 @@ class PoseTrainer:
                                      transform = Compose([eval(self.data_config["train_transform"])()]))
         self.test_dataset = dataset(self.data_config['data_dir'],
                                     self.data_config['test_list'],
+                                    augment_config_path=self.data_config['augmentation_config_path'],
                                     transform = Compose([eval(self.data_config["test_transform"])()]))
         self.loss_calculate = eval(self.config["loss"])()
         self.trainloader = None
@@ -93,6 +95,10 @@ class PoseTrainer:
 
         if not os.path.exists(self.training_config['output_dir']):
             os.makedirs(self.training_config['output_dir'], exist_ok=True)
+        # Init tensorboard writer
+        # if os.path.exists(os.path.join(self.training_config["output_dir"], "run")):
+        #     os.rmdir(os.path.join(self.training_config["output_dir"], "run"))
+        self.writer = SummaryWriter(os.path.join(self.training_config["output_dir"], "run"))
         self._init_torch_tensor()
         print("Successfully init trainer")
     
@@ -120,37 +126,39 @@ class PoseTrainer:
         list
             Loss report
         """
-        print("Start to train pose classification model")
+        print("Start to train model")
         loss_report = list()
         best_lost = np.inf
         best_acc = -np.inf
         for epoch in range(self.training_config['epoch']):
             if not epoch % self.training_config['saving_interval']:
                 model_name = "{}_epoch.pth".format(epoch)
-            for i, batch in enumerate(tqdm(self.trainloader, desc=f"Epoch {epoch}")):
+            for i, batch in enumerate(tqdm(self.trainloader, desc=f"Epoch [{epoch}]")):
                 self.optimizer.zero_grad(set_to_none=True)
-                loss = self.train_step(batch)
+                loss = self._train_step(batch)
                 loss = torch.mean(loss)
                 loss.backward()
                 self.optimizer.step()
+                self.writer.add_scalar('Loss/Train/Iteration', loss, epoch*(len(self.train_dataset)//self.data_config["batch_size"]) + i)
                 
-            result = self.evaluate(self.testloader)
-            self.epoch_end(epoch, result)
+            result = self._evaluate(self.testloader, epoch)
+            self._epoch_end(epoch, result)
             loss_report.append(result)
             if result['val_loss'] < best_lost:
                 best_lost = result["val_loss"]
-                self.save_model("best_loss_model.pth")
+                self._save_model("best_loss_model.pth")
             if "acc" in self.metric_config:
                 if result['val_acc'] > best_acc:
                     best_acc = result["val_acc"]
-                    self.save_model("best_acc_model.pth")
-
-        self.save_model("final.pth")
+                    self._save_model("best_acc_model.pth")
+        self.writer.flush()
+        self.writer.close()
+        self._save_model("final.pth")
         with open(os.path.join(self.training_config['output_dir'], self.training_config["loss_report_path"]), "w") as f:
             json.dump(loss_report, f)
         return loss_report
 
-    def train_step(self, batch):
+    def _train_step(self, batch):
         """Run train for a step corresponding to a batch
 
         Parameters
@@ -164,14 +172,15 @@ class PoseTrainer:
             Loss value
         """
         inputs, labels = batch
+        print(inputs)
         if torch.cuda.is_available():
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
-        out = self.model(inputs, self.device)
+        out = self.model(inputs)
         loss = self.loss_calculate(out, labels)
         return loss
 
-    def validation_step(self, batch):
+    def _validation_step(self, batch, epoch, idx):
         """Validate model for each step (batch)
 
         Parameters
@@ -185,19 +194,21 @@ class PoseTrainer:
             {val loss, val acc}
         """
         inputs, labels = batch
-        torch.cuda.empty_cache()
+        print(inputs)
         if torch.cuda.is_available():
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
-        out = self.model(inputs, self.device)
+        out = self.model(inputs)
         loss = self.loss_calculate(out, labels)
+        self.writer.add_scalar("Loss/Val/Iteration", loss, epoch*(len(self.test_dataset)//self.data_config["batch_size"]) + idx)
         if "acc" in self.metric_config:
             acc = accuracy(out, labels)
+            self.writer.add_scalar("Acc/Val/Iteration", acc, epoch*(len(self.test_dataset)//self.data_config['batch_size']) + idx)
             return {'val_loss': loss, 'val_acc': acc}
         else:
             return {'val_loss': loss}
 
-    def validation_epoch_end(self, outputs):
+    def _validation_epoch_end(self, outputs, epoch):
         """Calculate everage loss and acc on validation dataset
 
         Parameters
@@ -212,14 +223,16 @@ class PoseTrainer:
         """
         batch_losses = [x['val_loss'] for x in outputs]
         epoch_loss = torch.stack(batch_losses).mean()
+        self.writer.add_scalar("Loss/Val/Epoch", epoch_loss, epoch)
         if "acc" in self.metric_config:
             batch_accs = [x['val_acc'] for x in outputs]
             epoch_acc = torch.stack(batch_accs).mean()
+            self.writer.add_scalar("Acc/Val/Epoch", epoch_acc, epoch)
             return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
         else:
             return {'val_loss': epoch_loss.item()}
 
-    def evaluate(self, dataloader):
+    def _evaluate(self, dataloader, epoch):
         """Evaluate model on a dataset
 
         Parameters
@@ -232,10 +245,13 @@ class PoseTrainer:
         dict
             {loss on dataset, acc on dataset}
         """
-        outputs = [self.validation_step(batch) for batch in dataloader]
-        return self.validation_epoch_end(outputs)
+        self.model.eval()
+        with torch.no_grad():
+            outputs = [self._validation_step(batch, epoch, idx) for idx, batch in enumerate(dataloader)]
+        self.model.train()
+        return self._validation_epoch_end(outputs, epoch)
 
-    def epoch_end(self, epoch, result):
+    def _epoch_end(self, epoch, result):
         """Print result at the end of epoch
 
         Parameters
@@ -251,7 +267,7 @@ class PoseTrainer:
         else:
             print("Epoch [{}], val_loss: {:.4f}".format(epoch, result['val_loss']))
 
-    def save_model(self, model_name):
+    def _save_model(self, model_name):
         """Save model as .pth file
 
         Parameters

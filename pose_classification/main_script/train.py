@@ -7,7 +7,7 @@ import argparse
 import sys 
 import warnings
 
-from api.trainer import PoseTrainer
+from api.trainer import Trainer
 warnings.filterwarnings('ignore')
 
 def parse_argument():
@@ -31,7 +31,7 @@ def main():
     parser = parse_argument()
     args = parser.parse_args()
 
-    trainer = PoseTrainer(args.config_path)
+    trainer = Trainer(args.config_path)
     trainer.initialize()
     loss_report = trainer.run_train()
 

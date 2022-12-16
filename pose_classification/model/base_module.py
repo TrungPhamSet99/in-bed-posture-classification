@@ -252,7 +252,7 @@ class ConvBottleneck(nn.Module):
         self.conv2 = ConvBlock(botlleneck_size, output_channels, 3, 1)
         self.shortcut = shortcut
 
-    def forward(self, inputs, training=False, **kwargs):
+    def forward(self, inputs, **kwargs):
         """Forward implementation
 
         Parameters
@@ -265,10 +265,10 @@ class ConvBottleneck(nn.Module):
         torch.Tensor
             Output tensor
         """
-        if training:
-            if self.shortcut:
-                return inputs + self.conv2(self.conv1(inputs))
-            else:
-                return self.conv2(self.conv1(inputs))
+        if self.shortcut:
+            return inputs + self.conv2(self.conv1(inputs))
         else:
-            return self.conv1(inputs)
+            return self.conv2(self.conv1(inputs))
+    
+    def predict(self, inputs):
+        return self.conv1(inputs)

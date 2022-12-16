@@ -1,0 +1,8 @@
+{
+    "weight": "./autoencoder_v1_1/best_loss_model.pth",
+    "device": "cuda:0",
+    "module_name": "autoencoder",
+    "model_name": "AutoEncoderV1",
+    "model_config": "./cfg/model_config/autoencoder_v1.yaml",
+    "sample_input_path": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/slp_val/000000002525.png"
+}

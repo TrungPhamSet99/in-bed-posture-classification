@@ -114,7 +114,7 @@ class EnDeCoder(nn.Module):
 class BottleNeckAE(nn.Module):
     """Class represent bottleneck module in AutoEncoder model
     """
-    def __init__(self, config, training=False):
+    def __init__(self, config):
         """Constructor for BottleNeckAE class
 
         Parameters
@@ -126,12 +126,10 @@ class BottleNeckAE(nn.Module):
         """
         super(BottleNeckAE, self).__init__()
         self.module_list = []
-        self.training = training
         for element in config:
             module = eval(f"base_module.{element[0]}")
             self.module_list.append(module(*element[1:]))
         self.core_modules = nn.Sequential(*self.module_list)
-        self.training = training
     
     def forward(self, inputs, **kwargs):
         """Forward implementation
@@ -147,4 +145,29 @@ class BottleNeckAE(nn.Module):
         torch.Tensor
             Output tensor
         """
-        return self.core_modules[0](inputs, self.training)
+        return self.core_modules(inputs)
+    
+    def predict(self, inputs):
+        return self.core_modules[0].predict(inputs)
+    
+
+class CombineFirstStageOutput(nn.Module):
+    def __init__(self, config, **kwargs):
+        pass 
+    
+    def forward(self, hrnet_output, ae_output, **kwargs):
+        """Forward implementation to combine features
+
+        Parameters
+        ----------
+        hrnet_output : np.ndarray or torch.Tensor
+            Pose embedding vector from HRNet
+        ae_output : np.ndarray or torch.Tensor
+            Output from Autoencoder as feature extraction
+
+        Returns
+        -------
+        torch.Tensor
+            Combined feature -> classifier
+        """
+        return output

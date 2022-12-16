@@ -1,0 +1,27 @@
+Encoder: 
+  [
+    [ConvBlock, 3, 4, 5, 1],
+    [ConvBlock, 4, 8, 5, 1],
+    [ConvBlock, 8, 16, 5, 1],
+    [MaxPool, 3, 2],
+    [ConvBlock, 16, 32, 3, 1],
+    [ConvBlock, 32, 64, 3, 1],
+    [ConvBlock, 64, 128, 3, 1],
+    [MaxPool, 3, 2],
+  ]
+Bottleneck:
+  [
+    [ConvBottleneck, 128, 128, 0.5, True]
+  ]
+Decoder:
+  [
+    [UpSample, 2],
+    [TransposeConvBlock, 128, 64, 3, 1],
+    [TransposeConvBlock, 64, 32, 3, 1],
+    [TransposeConvBlock, 32, 16, 3, 1],
+    [UpSample, 2],
+    [TransposeConvBlock, 16, 8, 5, 1],
+    [TransposeConvBlock, 8, 4, 5, 1],
+    [TransposeConvBlock, 4, 3, 5, 1],
+    [ZeroPad, 2]
+  ]

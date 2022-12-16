@@ -1,0 +1,8 @@
+{
+    "weight": "./trained_model/raw/best_acc_model.pth",
+    "device": "cuda:0",
+    "module_name": "classifier",
+    "model_name": "PoseClassifierV2_1",
+    "model_config": "./cfg/model_config/pose_classifier_v2.1.json",
+    "sample_input_path": "/data/users/trungpq/22A/pose_data/POSE_SLP2022/6/00061_26.npy"
+}

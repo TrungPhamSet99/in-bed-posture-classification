@@ -258,22 +258,22 @@ class End2EndPoseClassifer(nn.Module):
         return (raw_pred*3) + final_output + 1
 
 class AutoEncoderV1(nn.Module):
-    def __init__(self, config, training=True):
+    def __init__(self, config, model_name):
         super(AutoEncoderV1, self).__init__()
         self.config = load_config(config)
         self.encoder = EnDeCoder(self.config["Encoder"])
         self.decoder = EnDeCoder(self.config["Decoder"])
-        self.bottleneck = BottleNeckAE(self.config["Bottleneck"], training)
+        self.bottleneck = BottleNeckAE(self.config["Bottleneck"])
 
-    def forward(self, inputs, device, **kwargs):
+    def forward(self, inputs, **kwargs):
         inputs = self.encoder(inputs)
-        if self.training:
-            return self.decoder(self.bottleneck(inputs))
-        else:
-            return self.bottleneck(inputs)
-    
+        return self.decoder(self.bottleneck(inputs))
+        
+    def predict(self, inputs):
+        inputs = self.encoder(inputs)
+        return self.bottleneck.predict(inputs)
 
-def model_gateway(model_name, model_config, training=True):
+def model_gateway(model_name, model_config):
     """Gateway to get model instance from config
 
     Parameters
@@ -297,9 +297,7 @@ def model_gateway(model_name, model_config, training=True):
         model = eval(model_name)
     except:
         raise ValueError(f"Do not support {model_name} in this version, please check your config again")
-    if "AutoEncoder" in model_name:
-        return model(model_config, training)
-    else:
-        return model(model_config, model_name)
+    
+    return model(model_config, model_name)
 
 
