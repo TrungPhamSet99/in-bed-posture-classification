@@ -151,6 +151,7 @@ class Trainer:
                 if result['val_acc'] > best_acc:
                     best_acc = result["val_acc"]
                     self._save_model("best_acc_model.pth")
+            self.scheduler.step()
         self.writer.flush()
         self.writer.close()
         self._save_model("final.pth")
@@ -172,7 +173,6 @@ class Trainer:
             Loss value
         """
         inputs, labels = batch
-        print(inputs)
         if torch.cuda.is_available():
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
@@ -194,7 +194,6 @@ class Trainer:
             {val loss, val acc}
         """
         inputs, labels = batch
-        print(inputs)
         if torch.cuda.is_available():
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
