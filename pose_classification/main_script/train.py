@@ -23,7 +23,7 @@ def parse_argument():
     parser = argparse.ArgumentParser(
         "Run script to train pose classification model")
     parser.add_argument('--config-path', type=str,
-                        help='Path to training config file', default="./cfg/train/train_autoencoder.json")
+                        help='Path to training config file', default="./cfg/train/train_config.json")
     return parser
 
 

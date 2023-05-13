@@ -71,8 +71,8 @@ class PosePredictor():
         if self.module_name == "classifier":
             # Get embedding vector as torch.Tensor from numpy pose
             return pose_to_embedding_v2(input_data).unsqueeze(0)
-        elif self.module_name == "autoencoder":
-            input_data = cv2.resize(input_data, (120,120)) 
+        elif "autoencoder" in self.module_name:
+            input_data = cv2.resize(input_data, (224,224)) 
             input_data = Compose([ToTensor(), Normalize(mean=self.AE_RGB_MEAN, std=self.AE_RGB_STD)])(input_data) # Convert (W,H,C) -> (C,W,H), normalize and convert to torch.FloatTensor
             return input_data.unsqueeze(0)
         else:
@@ -108,6 +108,8 @@ class PosePredictor():
         with torch.no_grad():
             if self.module_name == "classifier":
                 dnn_output = self.model(input_data)
+            elif "autoencoder" in self.module_name:
+                dnn_output = self.model.extract_features(input_data)
             else:
                 dnn_output = self.model.predict(input_data)
         # Post process and return output 

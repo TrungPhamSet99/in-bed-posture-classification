@@ -7,8 +7,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import json
 import numpy as np
+import model.base_module as base_module
 from model.base_model import BasePoseClassifier, EnDeCoder, BottleNeckAE
-from utils.general import load_config
+from utils.general import load_config, colorstr
+from model.efficientnet import EfficientNetAutoEncoder, EfficientNet
+from model.vgg19 import VGG19
+from tqdm import tqdm
 
 class PoseClassifierV1(BasePoseClassifier):
     def __init__(self, config, model_name):
@@ -80,7 +84,7 @@ class PoseClassifierV2_1(BasePoseClassifier):
                                        nn.ReLU())
                 setattr(self, _key, module)
 
-    def forward(self, xb, device):
+    def forward(self, xb):
         """Forward path for PoseClassifierV2_1 model
 
         Parameters
@@ -95,8 +99,8 @@ class PoseClassifierV2_1(BasePoseClassifier):
         torch.Tensor
             Output from model as torch.Tensor after softmax activation
         """
-        xb = xb.float()
-        xb.to(device)
+        # xb = xb.float()
+        # xb.to(device)
         conv_block_list = [block for block in list(
             self.config.keys()) if "conv" in block]
         linear_block_list = [block for block in list(
@@ -110,8 +114,9 @@ class PoseClassifierV2_1(BasePoseClassifier):
         for i in range(len(linear_block_list)):
             linear_block = eval(f"self.linear_block_{i+1}")
             xb = linear_block(xb)
-        output = self.softmax(xb)
-        return output
+        # output = self.softmax(xb)
+        # return output
+        return xb
 
 
 class PoseClassifierV2_2(BasePoseClassifier):
@@ -169,6 +174,44 @@ class PoseClassifierV2_2(BasePoseClassifier):
         output = self.softmax(xb)
         return output
 
+
+class PoseClassifierV3(nn.Module):
+    def __init__(self, config, model_name):
+        super(PoseClassifierV3, self).__init__()
+        self.config = config
+        self.model_name = model_name
+        self.feature_extractor = EfficientNet.from_pretrained("efficientnet-b0")
+        
+        print(self.feature_extractor)
+        self.linear1 = base_module.LinearBlock(1324,3)
+        self.linear2 = base_module.LinearBlock(556,3)
+        self.linear3 = base_module.LinearBlock(44,3)
+        self.linear4 = base_module.LinearBlock(16,3)
+        self.dropout = nn.Dropout(0.4)
+
+    @staticmethod
+    def parse_model(config):
+        module_list = nn.ModuleList()
+        for idx in tqdm(range(len(config)), desc=colorstr("Parsing module list from config")):
+            element = config[idx]
+            module_name, params = element[0], element[1:]
+            module = eval(f"base_module.{module_name}")
+            module_list.append(module(*params))
+        return nn.Sequential(*module_list)
+
+
+    def forward(self, inputs):
+        pose_embedding = inputs[0].float()
+        image = inputs[1].float()
+        pose_embedding = pose_embedding.to(torch.device("cuda:0"))
+        image = image.to(torch.device("cuda:0"))
+        image_feature = self.feature_extractor.extract_features(image)
+        image_feature = image_feature.flatten(start_dim=1)
+
+        combined = torch.cat((image_feature, pose_embedding), dim=1)
+        output = self.linear1(combined)
+
+        return output
 
 class End2EndPoseClassifer(nn.Module):
     def __init__(self, raw_model, supine_model, lying_left_model, lying_right_model):
@@ -273,6 +316,8 @@ class AutoEncoderV1(nn.Module):
         inputs = self.encoder(inputs)
         return self.bottleneck.predict(inputs)
 
+
+
 def model_gateway(model_name, model_config):
     """Gateway to get model instance from config
 
@@ -293,11 +338,19 @@ def model_gateway(model_name, model_config):
     ValueError
         Raise ValueError if model_name is invalid
     """
-    try:
-        model = eval(model_name)
-    except:
-        raise ValueError(f"Do not support {model_name} in this version, please check your config again")
+    if model_name != "EfficientNetAutoEncoder":
+        try:
+            model = eval(model_name)
+        except:
+            raise ValueError(f"Do not support {model_name} in this version, please check your config again")
+        
+        return model(model_config, model_name)
+    else:
+        return EfficientNetAutoEncoder.from_pretrained(model_config["version"])
+
+
+if __name__ == "__main__":
+    config_path = "../cfg/model_config/efficient_ae_config.yaml"
+    config = load_config(config_path)
+    model = model_gateway("EfficientNetAutoEncoder", config)
     
-    return model(model_config, model_name)
-
-

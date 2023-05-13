@@ -55,6 +55,7 @@ class BasePoseClassifier(nn.Module):
                 setattr(self, _key, sub_net)
             else:
                 pass
+
         self.dropout = nn.Dropout(p=0.5)
         self.softmax = nn.Softmax(dim=0)
         self.dropout1 = nn.Dropout(.5)

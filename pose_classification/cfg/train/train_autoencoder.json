@@ -1,7 +1,7 @@
 {
     "optimizer":{
         "name": "SGD",
-        "lr": 0.0005,
+        "lr": 0.005,
         "momentum": 0.9,
         "weight_decay": 0.0001,
         "lr_step": [300,500],
@@ -9,10 +9,10 @@
     },
     "data": {
         "dataset_name": "AutoEncoderDataset",
-        "data_dir": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/",
-        "train_list": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/train_list.txt",
-        "test_list": "/data/users/trungpq/22B/in-bed-posture-classification/data/coco/images/test_list.txt",
-        "batch_size": 128,
+        "data_dir": "/data2/samba/public/TrungPQ/22B/in-bed-posture-classification/data/coco/images/",
+        "train_list": "/data2/samba/public/TrungPQ/22B/in-bed-posture-classification/data/coco/images/train_list.txt",
+        "test_list": "/data2/samba/public/TrungPQ/22B/in-bed-posture-classification/data/coco/images/test_list.txt",
+        "batch_size": 2,
         "shuffle": true,
         "num_workers": 4,
         "pin_memory": false,
@@ -22,13 +22,13 @@
     },
     "training": {
         "epoch": 1000,
-        "output_dir": "./autoencoder_v2/",
+        "output_dir": "./efficientnet_ae/",
         "saving_interval": 50,
         "loss_report_path": "loss_report.json"
     },
     "metric": ["loss"],
     "device": "cuda:0",
-    "model_name": "AutoEncoderV1",
-    "model_config": "./cfg/model_config/autoencoder_v2.yaml",
+    "model_name": "EfficientNetAutoEncoder",
+    "model_config": "./cfg/model_config/efficient_ae_config.yaml",
     "loss": "nn.MSELoss"
 }

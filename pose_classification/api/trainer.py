@@ -14,10 +14,8 @@ import itertools
 from torch.utils.tensorboard import SummaryWriter
 from model.target_model import model_gateway
 from model.base_module import ConvBlock, TransposeConvBlock
-from model.model_utils import count_params
 from data.normal_dataset import NormalPoseDataset
-from data.autoencoder_dataset import AutoEncoderDataset
-from utils.general import load_config, accuracy, colorstr
+from utils.general import load_config, accuracy, colorstr, count_params
 from utils.focal_loss import FocalLoss
 
 
@@ -40,23 +38,26 @@ class Trainer:
         # Get model from config
         self.model = model_gateway(self.config["model_name"], self.model_config)
         total_params, trainable_params = count_params(self.model)
-        print(colorstr("Total params: "), total_params)
-        print(colorstr("Trainable params: "), trainable_params)
-
+        
         dataset = eval(self.data_config["dataset_name"])
         self.train_dataset = dataset(self.data_config['data_dir'],
                                      self.data_config['train_list'],
+                                     self.data_config['mapping_file_train'],
+                                     self.data_config['image_dir'],
                                      augment_config_path=self.data_config['augmentation_config_path'],
                                      transform = Compose([eval(self.data_config["train_transform"])()]))
         self.test_dataset = dataset(self.data_config['data_dir'],
                                     self.data_config['test_list'],
-                                    augment_config_path=self.data_config['augmentation_config_path'],
+                                    self.data_config['mapping_file_test'],
+                                    self.data_config['image_dir'],
                                     transform = Compose([eval(self.data_config["test_transform"])()]))
         self.loss_calculate = eval(self.config["loss"])()
         self.trainloader = None
         self.testloader = None
         self.optimizer = None
         self.scheduler = None
+        print(colorstr("Total params: "), total_params)
+        print(colorstr("Trainable params: "), trainable_params)
 
     def initialize(self):
         """
@@ -70,6 +71,7 @@ class Trainer:
         print(colorstr(f"Number sample for training set: {len(self.train_dataset)}"))
         print(colorstr(f"Number sample for test set: {len(self.test_dataset)}"))
         self.model.apply(self.init_weights)
+        # print(self.model)
         self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
                                                        batch_size=self.data_config['batch_size'],
                                                        shuffle=self.data_config['shuffle'],
@@ -109,6 +111,7 @@ class Trainer:
         if torch.cuda.is_available():
             self.device = torch.device(self.config["device"])
             self.model = self.model.to(self.device)
+
         else:
             self.device = torch.device('cpu')
     
@@ -140,7 +143,7 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 self.writer.add_scalar('Loss/Train/Iteration', loss, epoch*(len(self.train_dataset)//self.data_config["batch_size"]) + i)
-                
+            print("Train loss: ", loss)
             result = self._evaluate(self.testloader, epoch)
             self._epoch_end(epoch, result)
             loss_report.append(result)
@@ -173,10 +176,15 @@ class Trainer:
             Loss value
         """
         inputs, labels = batch
+        # print(inputs.shape)
         if torch.cuda.is_available():
-            inputs = inputs.to(self.device)
+            for _input in inputs:
+                _input = _input.float()
+                _input = _input.to(self.device)
             labels = labels.to(self.device)
         out = self.model(inputs)
+        # print(out)
+        # print(labels)
         loss = self.loss_calculate(out, labels)
         return loss
 
@@ -195,7 +203,9 @@ class Trainer:
         """
         inputs, labels = batch
         if torch.cuda.is_available():
-            inputs = inputs.to(self.device)
+            for _input in inputs:
+                _input = _input.float()
+                _input = _input.to(self.device)
             labels = labels.to(self.device)
         out = self.model(inputs)
         loss = self.loss_calculate(out, labels)
