@@ -11,6 +11,7 @@ import model.base_module as base_module
 from model.base_model import BasePoseClassifier, EnDeCoder, BottleNeckAE
 from utils.general import load_config, colorstr
 from model.efficientnet import EfficientNetAutoEncoder, EfficientNet
+from model.swin_utils import swin_transformer_gateway
 from model.vgg19 import VGG19
 from tqdm import tqdm
 
@@ -180,14 +181,17 @@ class PoseClassifierV3(nn.Module):
         super(PoseClassifierV3, self).__init__()
         self.config = config
         self.model_name = model_name
-        self.feature_extractor = EfficientNet.from_pretrained("efficientnet-b0")
+        # self.feature_extractor = EfficientNet.from_pretrained("efficientnet-b2")
+        # self.feature_extractor, self.swin_config = swin_transformer_gateway(pretrained=True)
         
-        print(self.feature_extractor)
-        self.linear1 = base_module.LinearBlock(1324,3)
-        self.linear2 = base_module.LinearBlock(556,3)
-        self.linear3 = base_module.LinearBlock(44,3)
-        self.linear4 = base_module.LinearBlock(16,3)
-        self.dropout = nn.Dropout(0.4)
+        # print(self.feature_extractor)
+        self.embedding = nn.Embedding(160, 8)
+        # self.linear1 = nn.Linear(768, 512)
+        # self.linear2 = nn.Linear(392, 256)
+        self.linear3 = nn.Linear(96, 3)
+        self.dropout1 = nn.Dropout(0.4)
+        self.dropout2 = nn.Dropout(0.2)
+        self.relu = nn.ReLU()
 
     @staticmethod
     def parse_model(config):
@@ -201,17 +205,21 @@ class PoseClassifierV3(nn.Module):
 
 
     def forward(self, inputs):
-        pose_embedding = inputs[0].float()
+        pose_embedding = inputs[0].int()
         image = inputs[1].float()
         pose_embedding = pose_embedding.to(torch.device("cuda:0"))
-        image = image.to(torch.device("cuda:0"))
-        image_feature = self.feature_extractor.extract_features(image)
-        image_feature = image_feature.flatten(start_dim=1)
+        # pose_embedding = torch.abs(pose_embedding)
 
-        combined = torch.cat((image_feature, pose_embedding), dim=1)
-        output = self.linear1(combined)
+        # image = image.to(torch.device("cuda:0"))
+        # image_feature = self.feature_extractor.extract_features(image)
+        # pose_embedding = pose_embedding.flatten(start_dim=1)
+        pose_embedding = self.embedding(pose_embedding).flatten(start_dim=1)
+        pose_embedding = self.relu(pose_embedding)
+        # image_feature = self.linear1(image_feature)
 
-        return output
+        pose_embedding = self.linear3(pose_embedding)
+
+        return pose_embedding
 
 class End2EndPoseClassifer(nn.Module):
     def __init__(self, raw_model, supine_model, lying_left_model, lying_right_model):
@@ -300,22 +308,6 @@ class End2EndPoseClassifer(nn.Module):
         # Convert 3 classes label to 9 classes label and return output
         return (raw_pred*3) + final_output + 1
 
-class AutoEncoderV1(nn.Module):
-    def __init__(self, config, model_name):
-        super(AutoEncoderV1, self).__init__()
-        self.config = load_config(config)
-        self.encoder = EnDeCoder(self.config["Encoder"])
-        self.decoder = EnDeCoder(self.config["Decoder"])
-        self.bottleneck = BottleNeckAE(self.config["Bottleneck"])
-
-    def forward(self, inputs, **kwargs):
-        inputs = self.encoder(inputs)
-        return self.decoder(self.bottleneck(inputs))
-        
-    def predict(self, inputs):
-        inputs = self.encoder(inputs)
-        return self.bottleneck.predict(inputs)
-
 
 
 def model_gateway(model_name, model_config):
@@ -343,8 +335,14 @@ def model_gateway(model_name, model_config):
             model = eval(model_name)
         except:
             raise ValueError(f"Do not support {model_name} in this version, please check your config again")
-        
-        return model(model_config, model_name)
+        if model_name != "PoseClassifierV3":
+            return model(model_config, model_name)
+        else:
+            _model = model(model_config, model_name)
+            try:
+                return _model, _model.swin_config
+            except:
+                return _model
     else:
         return EfficientNetAutoEncoder.from_pretrained(model_config["version"])
 

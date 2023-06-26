@@ -11,7 +11,7 @@ def get_args():
                         help='Path to JSON mapping file for training images')
     parser.add_argument('--mapping-file-val', type=str, default="../json_files/val_SLP_path.json",
                         help='Path to JSON mapping file for validation images')
-    parser.add_argument('--keypoint-data-dir', type=str, default="../../../../POSE_SLP2022/",
+    parser.add_argument('--keypoint-data-dir', type=str, default="/data/users/trungpq/22A/pose_data/POSE_SLP2022_v2/",
                         help='Path to JSON mapping file for validation images')
     args = parser.parse_args()
     return args
@@ -33,38 +33,47 @@ def main():
             continue
         for file in files:
             feature_paths.append(os.path.join(root.split("/")[-1], file))
-    output = {}
+    output_train = {}
+    output_test = {}
     for sample in train_mapping:
+        print(sample)
         if "simLab" in sample:
             continue
+        condition = sample.split("/")[-2]
+        
         person_id = sample.split("/")[5].lstrip("0")
         image_name = sample.split("/")[-1]
         image_id = image_name.replace("image_", "").replace(".png", "").lstrip("0")
 
         hr_train_image_name = train_mapping[sample].split("/")[-1]
         key = f"train_{hr_train_image_name}"
-        print(person_id, image_id)
+        # print(person_id, image_id)
         feature_file = [feat for feat in feature_paths if f"00{person_id}_{image_id}.npy" in feat]
         if len(feature_file):
-            output[key] = feature_file[0]
+            output_train[key] = [feature_file[0], condition]
 
     for sample in test_mapping:
         if "simLab" in sample:
             continue
+        condition = sample.split("/")[-2]
         person_id = sample.split("/")[5].lstrip("0")
         image_name = sample.split("/")[-1]
         image_id = image_name.replace("image_", "").replace(".png", "").lstrip("0")
 
         hr_train_image_name = test_mapping[sample].split("/")[-1]
         key = f"test_{hr_train_image_name}"
-        print(person_id, image_id)
+        # print(person_id, image_id)
         feature_file = [feat for feat in feature_paths if f"00{person_id}_{image_id}.npy" in feat]
-        print(feature_file)
+        # print(feature_file)
         if len(feature_file):
-            output[key] = feature_file[0]
+            output_test[key] = [feature_file[0], condition]
 
-    with open("single_module_mapping_file.json", "w") as f:
-        json.dump(output, f)
+
+    with open("single_module_mapping_file_train.json", "w") as f:
+        json.dump(output_train, f)
+
+    with open("single_module_mapping_file_test.json", "w") as f:
+        json.dump(output_test, f) 
 
 
 if __name__ == "__main__":

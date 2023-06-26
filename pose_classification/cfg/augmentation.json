@@ -1,50 +1,29 @@
 {
-	"prob": 0.3,
-	"magnitude_x": [-10,10],
-	"magnitude_y": [-1,1],
-	"non_geometric_transformations":{
-      "prob": 0.3,
-      "color_augment": {
-         "prob": 0,
-         "sub_methods": [
-            {"name": "AddToBrightness", "prob": 0.15, "magnitude": [-10, 10]},
-            {"name": "MultiplyHue", "prob": 0.15, "magnitude": [0.5, 1.5]},
-            {"name": "MultiplySaturation", "prob": 0.15, "magnitude": [0.5, 1.5]},
-            {"name": "MultiplyHueAndSaturation", "prob": 0.15, "magnitude": [0.5, 1.5]},
-            {"name": "AddToHueAndSaturation", "prob": 0.15, "magnitude": [-30, 30]},
-            {"name": "Posterize", "prob": 0, "magnitude": [1, 3]},
-            {"name": "AddToSaturation", "prob": 0.15 , "magnitude": [-20, 20]},
-            {"name": "RemoveSaturation", "prob": 0.1 , "magnitude": [0, 1]}
-         ]
+	"prob": 0,
+   "magnitude_x": [-10,10],
+   "magnitude_y": [-2,2],
+	"geometric_transformations": {
+      "prob": 0.5,
+      "Perspective": {
+         "prob": 0.15,
+         "magnitude": [-0.00001, 0.00001]
       },
-      "contrast_augment": {
+      "Rotation": {
          "prob": 0.5,
-         "sub_methods": [
-            {"name": "GammaContrast", "prob": 0.3, "magnitude": [0.8, 1.2]},
-            {"name": "LogContrast", "prob": 0.3, "magnitude": [0.8, 1.2]},
-            {"name": "LinearContrast", "prob": 0.4, "magnitude": [0.8, 1.2]}
-         ]
+         "magnitude": [-0.03, 0.03]
       },
-      "noise_augment": {
-         "prob": 0,
-         "sub_methods": [
-            {"name": "AddElementwise", "prob": 0.2, "magnitude": [-20, 20]},
-            {"name": "AdditiveGaussianNoise", "prob": 0.2, "magnitude": [0, 10]},
-            {"name": "AdditivePoissonNoise", "prob": 0.2, "magnitude": [0, 5]},
-            {"name": "AdditiveLaplaceNoise", "prob": 0.2, "magnitude": [0, 10]},
-            {"name": "SaltAndPepper", "prob": 0.2, "magnitude": [0.001, 0.005]}
-         ]
+      "Scale": {
+         "prob": 0.5,
+         "magnitude": [0.8, 1.2],
+         "sub_magnitude": [0.95, 1.05]
       },
-      "blur_augment": {
+      "Shear": {
+         "prob": 0.5,
+         "magnitude": [-0.03, 0.03]
+      },
+      "Translation": {
          "prob": 0,
-         "sub_methods": [
-            {"name": "AverageBlur", "prob": 0.15, "magnitude": [3,5]},
-            {"name": "MedianBlur", "prob": 0.15, "magnitude": [3,5]},
-            {"name": "GaussianBlur", "prob": 0.15, "magnitude": [0.0,1.0]},
-            {"name": "MotionBlur", "prob": 0.15, "magnitude": [3,5]},
-            {"name": "JpegCompression", "prob": 0.2, "magnitude": [25,85]},
-            {"name": "Sharpen", "prob": 0.2, "magnitude": [0,0.2]}
-         ]
+         "magnitude": [-0.25, 0.25]
       }
    }
 }

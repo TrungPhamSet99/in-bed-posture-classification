@@ -52,6 +52,14 @@ def leaky_activation(x):
     activation = nn.LeakyReLU(negative_slope=0.1)
     return activation(x)
 
+def to_onehot(inputs, num_classes):
+    return np.squeeze(np.eye(num_classes)[inputs.reshape(-1)])
+
+def adjust_learning_rate(optimizer, epoch, lr):
+    lr = lr * (0.1 ** (epoch // 10))
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = lr
+
 def autopad(k, p=None, d=1):  
     if d > 1:
         k = d * (k - 1) + 1 if isinstance(k, int) else [d * (x - 1) + 1 for x in k]  # actual kernel-size
@@ -126,6 +134,7 @@ def combine_pose_embedding_and_autoencoder_output(pose_embedding, autoencoder_ou
 
 
 def get_distance(lmk_from, lmk_to):
+    # Return L2 distance
     return lmk_to - lmk_from
 
 
@@ -197,6 +206,13 @@ def normalize_pose(pose):
 
 
 def build_embedding_from_distance(pose):
+    # distance_list = []
+    # for start_point in SLP_DICT:
+    #     index = list(SLP_DICT.keys()).index(start_point)
+    #     for i in range(index+1, len(SLP_DICT)):
+    #         end_point = list(SLP_DICT.keys())[i]
+    #         distance_list.append(get_distance_by_name(pose, start_point, end_point))
+    # return np.asarray(distance_list)
     distance_embedding = np.array([
         get_distance_by_name(pose, "Left Shoulder", "Right Shoulder"),
         get_distance_by_name(pose, "Left Elbow", "Right Elbow"),
@@ -208,6 +224,7 @@ def build_embedding_from_distance(pose):
         get_distance_by_name(pose, "Thorax", "Right Wrist")
     ])
     return distance_embedding
+
 
 
 def pose_to_embedding_v1(pose):
@@ -251,6 +268,7 @@ def pose_to_embedding_v2(pose):
 
     # return torch.from_numpy(np.concatenate((norm_input, distance_embedding), axis=0).flatten())
     embedding = torch.from_numpy(np.transpose(np.concatenate((norm_input, distance_embedding), axis=0))).flatten()
+    # embedding = torch.from_numpy(np.transpose(norm_input)).flatten()
     return embedding
 
 def load_config(path):
@@ -294,6 +312,7 @@ def accuracy(outputs, labels):
         accuracy value
     """
     _, preds = torch.max(outputs, dim=1)
+    # _, labels = torch.max(labels, dim=1)
     return torch.tensor(torch.sum(preds == labels).item()/len(preds))
 
 

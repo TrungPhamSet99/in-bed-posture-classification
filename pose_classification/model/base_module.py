@@ -295,6 +295,8 @@ class LinearBlock(nn.Module):
             return F.relu(self.linear(inputs))
         elif self.act_func == "softmax":
             return F.softmax(self.linear(inputs), dim=0)
+        elif self.act_func == "none":
+            return self.linear(inputs)
         else:
             raise NotImplementedError(f"Do not support {self.act_func} function")
 

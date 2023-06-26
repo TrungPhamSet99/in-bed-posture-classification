@@ -21,11 +21,11 @@ def parse_argument():
     """
     parser = argparse.ArgumentParser(MANUAL)
     parser.add_argument('--nine-class-path', type=str, 
-                        help='Path to root of 9 class dataset', default="../pose_data/SLP_9_CLASS/data/")
+                        help='Path to root of 9 class dataset', default="/data/users/trungpq/22A/pose_data/SLP_9_CLASS/data")
     parser.add_argument('--original-path', type=str,
-                        help='Path to root of original dataset', default="../pose_data/SLP2022/SLP/danaLab/")
+                        help='Path to root of original dataset', default="/data/users/trungpq/22A/pose_data/SLP2022/SLP/danaLab")
     parser.add_argument('--save-path', type=str, 
-                        help='Path to save output JSON file', default="./9_classes_label.json")
+                        help='Path to save output JSON file', default="./9_classes_label_v2.json")
     return parser
 
 
@@ -42,7 +42,10 @@ def get_condition(fp, original=True):
         return fp.split("/")[-5].split("_")[-1].lower()
 
 def get_class(original_sample_path, nine_class_root):
-    person_id = original_sample_path.split("/")[-4].strip("0")
+    print(original_sample_path)
+    person_id = original_sample_path.split("/")[-4].lstrip("0")
+    print(person_id)
+    print("------------------------------------------------")
     image_id = original_sample_path.split("/")[-1].split("_")[-1].replace(".png","")
     for root, dirs, files in os.walk(nine_class_root):
         if "train_aug" in root:
@@ -50,6 +53,8 @@ def get_class(original_sample_path, nine_class_root):
         for file in files:
             if file == f"image_{image_id}_{person_id}.png":
                 fp = os.path.join(root, file)
+                if person_id == "80":
+                    print(fp)
                 return get_class_from_9_class_path(fp)
     return "Unknown"
 

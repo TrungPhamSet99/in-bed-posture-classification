@@ -8,7 +8,7 @@ from torch.autograd import Variable
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma=0, alpha=None, size_average=True):
+    def __init__(self, gamma=1, alpha=None, size_average=True):
         """Constructor for FocalLoss
 
         Parameters

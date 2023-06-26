@@ -20,13 +20,13 @@ def parse_argument():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--nine-class-label', type=str, 
-                        help='Path to 9 class label file', default="./9_classes_label.json")
+                        help='Path to 9 class label file', default="./9_classes_label_v2.json")
     parser.add_argument('--train-json-path', type=str,
                         help='Path to train json path', default="./train_SLP_path.json")
     parser.add_argument('--val-json-path', type=str, 
                         help='Path to val json path', default="./val_SLP_path.json")
     parser.add_argument('--save-path', type=str, 
-                        help='Path to save output file', default="./everything.json")
+                        help='Path to save output file', default="./everything_v2.json")
     return parser
 
 

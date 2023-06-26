@@ -29,11 +29,11 @@ def parse_argument():
     """
     parser = argparse.ArgumentParser(MANUAL)
     parser.add_argument('--SLP-root-path', type=str, 
-                        help='Path to root of 9 class dataset', default="../pose_data/SLP2022/SLP/danaLab/")
+                        help='Path to root of 9 class dataset', default="/data/users/trungpq/22A/pose_data/SLP2022/SLP/danaLab")
     parser.add_argument('--merged-info-path', type=str,
-                        help='Path to root of original dataset', default="./everything.json")
+                        help='Path to root of original dataset', default="./everything_v2.json")
     parser.add_argument('--output-dir', type=str, 
-                        help='Path to save output keypoint file', default="../pose_data/POSE_SLP2022/")
+                        help='Path to save output keypoint file', default="/data/users/trungpq/22A/pose_data/POSE_SLP2022_v2")
     return parser
 
 
