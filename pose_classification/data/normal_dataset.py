@@ -241,9 +241,10 @@ class NormalPoseDataset(Dataset):
                         pred = 2
                     else:
                         pred = 1  
-                    if pred != label and label==1:
-                        print(image_file, left_angle, right_angle, angle_diff, knee_distance, feet_distance, knee_y, feet_y, pred, label)
-                        cv2.imwrite(f"./vis/{label}_{image_file}", image)
+                        
+        if pred != label:
+            print(image_file, left_angle, right_angle, angle_diff, knee_distance, feet_distance, knee_y, feet_y, pred, label)
+            cv2.imwrite(f"./vis/{label}_{image_file}", image)
         
         return pred, label
         # return (left_angle, right_angle, knee_distance, feet_distance, knee_and_hip_diff_y), self.classes.index(c)
