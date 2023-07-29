@@ -19,7 +19,7 @@ class NormalPoseDataset(Dataset):
     RGB_MEAN = [0.18988903, 0.18988903, 0.18988903]
     RGB_STD = [0.09772425, 0.09772425, 0.09772425]
     NORMALIZE = Compose([Normalize(mean=RGB_MEAN, std=RGB_STD)])
-    def __init__(self, data_dir, list_path, mapping_file, image_dir, augment_config_path=None, transform=None):
+    def __init__(self, data_dir, list_path, mapping_file, image_dir, classes = None,augment_config_path=None, transform=None):
         """Constructor for NormalPoseDataset
 
         Parameters
@@ -33,7 +33,7 @@ class NormalPoseDataset(Dataset):
         transform : callable object, optional
             Optional transform to be applied, by default None
         """
-        self.update_classes = json.load(open("/data/users/trungpq/23A/in-bed-posture-classification/pose_classification/scripts_to_prepare_data_phase2/single_module_data/update_classes.json"))
+        self.update_classes = json.load(open("/data/users/trungpq/23A/in-bed-posture-classification/pose_classification/scripts/data/phase2/single_module_data/update_classes.json"))
         self.data_root = data_dir
         self.data_list_path = list_path
         self.transform = transform
@@ -50,7 +50,7 @@ class NormalPoseDataset(Dataset):
         elif isinstance(list_path, list):
             self.data_paths = list_path
 
-        self.classes = ["7", "8", "9"]
+        self.classes = classes
         if augment_config_path is not None:
             self.augmentor = Augmentor(augment_config_path)
         else:
@@ -131,6 +131,7 @@ class NormalPoseDataset(Dataset):
 
         if self.augmentor is not None:
             image, pose, vis_image = self.augmentor(image, pose, image_file)
+        
         # image = cv2.resize(image, (224, 224))
         # pose = self.scale_pose(pose, (120,160), (160,160))
         # pose = pose_to_embedding_v2(pose)
@@ -143,111 +144,7 @@ class NormalPoseDataset(Dataset):
             label = self.classes.index(str(self.update_classes[image_file]))
         else:
             label = self.classes.index(c)
-
-        # Calculate geometric parameters related to angle and distance
-        neck_coord = pose[:,12]
-        sub_pose = pose[:,:6]
-        center_of_hip = (sub_pose[:,2] + sub_pose[:,5]) / 2
-        base_distance = np.linalg.norm(neck_coord - center_of_hip) # Distance from neck to center of hip
-        avg_length_of_legs = (np.linalg.norm(sub_pose[:,2] - sub_pose[:,0]) + np.linalg.norm(sub_pose[:,2] - sub_pose[:,0])) / 2 
-        knee_distance = np.linalg.norm(sub_pose[:,1] - sub_pose[:,4]) # Distance between 2 knees
-        feet_distance = np.linalg.norm(sub_pose[:,0] - sub_pose[:,5]) # Distance between 2 feet
-
-        knee_y = (sub_pose[1][1], sub_pose[1][4])
-        feet_y = (sub_pose[1][0], sub_pose[1][5])
-        hip_y = (sub_pose[1][2], sub_pose[1][3])
-        
-
-        knee_and_hip_diff_y = ((knee_y[0] - hip_y[0]) + (knee_y[0] - hip_y[1])) / 2
-        
-
-        knee_x = (sub_pose[0][1], sub_pose[0][4])
-        feet_x = (sub_pose[0][0], sub_pose[0][5])
-        knee_and_feet_diff_x = ((knee_x[0] - feet_x[0]) + (knee_x[0] - feet_x[1])) / 2
-
-        knee_and_feet_diff_y = ((knee_y[0] - feet_y[0]) + (knee_y[0] - feet_y[1])) / 2
-
-        right_side = [sub_pose[0][0], sub_pose[1][0],
-                      sub_pose[0][1], sub_pose[1][1],
-                      sub_pose[0][2], sub_pose[1][2]]
-        left_side = [sub_pose[0][3], sub_pose[1][3],
-                     sub_pose[0][4], sub_pose[1][4],
-                     sub_pose[0][5], sub_pose[1][5]]
-        left_angle = self.calculate_angle((left_side[0], left_side[1], left_side[2], left_side[3]),
-                                          (left_side[2], left_side[3], left_side[4], left_side[5]))
-        
-        right_angle = self.calculate_angle((right_side[0], right_side[1], right_side[2], right_side[3]),
-                                           (right_side[2], right_side[3], right_side[4], right_side[5]))
-        
-
-        angle_diff = abs(left_angle - right_angle)
-        if math.isnan(right_angle):
-            right_angle = 0
-        if math.isnan(left_angle):
-            left_angle = 0
-        # return (sub_pose, image), self.classes.index(c)
-        if self.classes == ["1","2","3"]:
-            angle_thresh = [35, 25]
-            distance_thresh = [5, 42]
-            if left_angle <= angle_thresh[0] and right_angle <= angle_thresh[0]:
-                if abs(sub_pose[1][2] - sub_pose[1][3]) < distance_thresh[0] and \
-                   abs(sub_pose[1][0] - sub_pose[1][5]) < distance_thresh[0] and \
-                   avg_length_of_legs > distance_thresh[1]:
-                    pred = 0
-                else: 
-                    if knee_distance - feet_distance < distance_thresh[0] and avg_length_of_legs > distance_thresh[1]:
-                        pred = 1
-                    else: 
-                        pred = 2
-            else:
-                if (left_angle >= angle_thresh[1] and right_angle <= angle_thresh[1]) or \
-                   (left_angle <= angle_thresh[1] and right_angle >= angle_thresh[1]):
-                    if feet_distance < 10:
-                        pred = 2
-                    else:
-                        pred = 1
-                elif (left_angle >= angle_thresh[1]) and (right_angle >= angle_thresh[1]):
-                    pred = 2
-
-        elif self.classes == ["4","5","6"] or self.classes == ["7","8","9"]:
-            angle_thresh = [35, 25]
-            if knee_and_hip_diff_y < 15:
-                # Pred can be 1 or 2
-                if knee_distance < 25 and (left_angle > 35 and right_angle > 35):
-                    pred = 2
-                else:
-                    pred = 1
-            else:
-                # Pred can be 0, 1 or 2
-                if knee_distance < 15 and feet_distance < 20:
-                    # Pred can be 0 or 2
-                    if (left_angle + right_angle) / 2 > 60:
-                        if (left_angle + right_angle) / 2 > 70 or abs(knee_and_feet_diff_x) > 18:
-                            pred = 2
-                        else:
-                            pred = 0
-                    elif abs(knee_and_feet_diff_y) < 10:
-                        pred = 2
-                    else: 
-                        pred = 0
-                else:
-                    if (knee_and_hip_diff_y > 25 and knee_distance < 15 and feet_distance < 20) or \
-                       (left_angle < 45 and right_angle < 45 and angle_diff < 35) or \
-                       (left_angle < 60 and right_angle < 60 and abs(feet_y[0] - feet_y[1]) < 10):
-                        pred = 0
-                    elif (left_angle > 60 and right_angle > 60 and angle_diff < 15) or \
-                         (knee_distance < 20 and abs(feet_y[0] - feet_y[1]) < 10) or \
-                         ((left_angle + right_angle) / 2 > 60 and knee_distance < 5):
-                        pred = 2
-                    else:
-                        pred = 1  
-                        
-        if pred != label:
-            print(image_file, left_angle, right_angle, angle_diff, knee_distance, feet_distance, knee_y, feet_y, pred, label)
-            cv2.imwrite(f"./vis/{label}_{image_file}", image)
-        
-        return pred, label
-        # return (left_angle, right_angle, knee_distance, feet_distance, knee_and_hip_diff_y), self.classes.index(c)
+        return pose, label
 
 
 def batch_mean_and_std(loader):
@@ -256,9 +153,6 @@ def batch_mean_and_std(loader):
     fst_moment = torch.empty(40)
     snd_moment = torch.empty(40)
     for tensor, _ in loader:
-        print(torch.max(tensor))
-        print(torch.min(tensor))
-        print("--------------------------------")
         b, c, h, w = tensor.shape
         nb_elements = b * h * w
         sum_ = torch.sum(tensor, dim=[0,2,3])

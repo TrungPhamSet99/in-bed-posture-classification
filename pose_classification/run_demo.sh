@@ -2,11 +2,11 @@
 export PYTHONPATH=$PYTHONPATH:'./'
 
 if [ "$1" = "predict" ]; then
-	python3 main_script/predict.py
+	python3 main_script/core/predict.py
 elif [ "$1" = "train" ]; then
-	CUDA_LAUNCH_BLOCKING=1 python3 main_script/train.py
+	python3 main_script/core/train.py
 elif [ "$1" = "end2end_eval" ]; then
-	python3 utils/angle_evaluate.py
+	python3 lib/utils/angle_evaluate.py
 elif [ "$1" = "single_eval" ]; then
 	python3 api/evaluator.py
 elif [ "$1" = "autoencoder" ]; then
