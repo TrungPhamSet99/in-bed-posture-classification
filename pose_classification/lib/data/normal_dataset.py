@@ -19,7 +19,7 @@ class NormalPoseDataset(Dataset):
     RGB_MEAN = [0.18988903, 0.18988903, 0.18988903]
     RGB_STD = [0.09772425, 0.09772425, 0.09772425]
     NORMALIZE = Compose([Normalize(mean=RGB_MEAN, std=RGB_STD)])
-    def __init__(self, data_dir, list_path, mapping_file, image_dir, classes = None,augment_config_path=None, transform=None):
+    def __init__(self, data_dir, list_path, mapping_file, image_dir, classes = None, augment_config_path=None, transform=None):
         """Constructor for NormalPoseDataset
 
         Parameters
@@ -34,6 +34,7 @@ class NormalPoseDataset(Dataset):
             Optional transform to be applied, by default None
         """
         self.update_classes = json.load(open("/data/users/trungpq/23A/in-bed-posture-classification/pose_classification/scripts/data/phase2/single_module_data/update_classes.json"))
+        self.hrnet_output = json.load(open("/data/users/trungpq/23A/in-bed-posture-classification/pose_classification/scripts/data/phase2/json_files/hrnet_test_output.json"))
         self.data_root = data_dir
         self.data_list_path = list_path
         self.transform = transform
@@ -56,6 +57,7 @@ class NormalPoseDataset(Dataset):
         else:
             self.augmentor = None
         self.image_keys, self.dis_of_samples = self.filter_image_keys()
+        print(self.dis_of_samples)
 
     @staticmethod
     def calculate_angle(first_line, second_line):
@@ -88,7 +90,7 @@ class NormalPoseDataset(Dataset):
             c = self.mapping[sample][0].split("/")[-2]
             if c in self.classes:
                 condition = self.mapping[sample][1]
-                if condition in ["uncover", "cover1", "cover2"]:
+                if condition in ["cover2"]:
                     index = self.classes.index(c)
                     dis_of_samples[index] += 1
                     output.append(sample)
@@ -100,7 +102,26 @@ class NormalPoseDataset(Dataset):
         x_scale = target_shape[0] / original_shape[0]
         y_scale = target_shape[1] / original_shape[1]
         return np.array([pose[0,:]*x_scale, pose[1,:]*y_scale])
-
+    
+    def load_pose_from_hrnet_output(self, image_name):
+        image_id = image_name.lstrip("0").replace(".png", "")
+        if image_id == "":
+            image_id = "0"
+        for element in self.hrnet_output:
+            if element['image_id'] == int(image_id):
+                pose = element['keypoints']
+                break 
+        pose = [element for element in pose if element > 2]
+        x_list = []
+        y_list = []
+        for i, element in enumerate(pose):
+            if i in list(range(0,27,2)):
+                x_list.append(element)
+            else:
+                y_list.append(element)
+        pose = np.asarray([[x_list, y_list]])
+        return pose[0, :, :]
+    
     def __getitem__(self, idx):
         """Get data items by index
 
@@ -119,32 +140,41 @@ class NormalPoseDataset(Dataset):
         c = path.split("/")[-2]
         pose_fp = os.path.join(self.data_root, path)
         image_fp = os.path.join(self.image_dir, image_file)
+        # print(image_fp, pose_fp)
 
         if self.mode == "train":
             image_fp = image_fp.replace("train_", "slp_train/")
         else:
             image_fp = image_fp.replace("test_", "slp_val/")
-        pose = np.load(pose_fp)
+        # pose = np.load(pose_fp)
+
+        pose = self.load_pose_from_hrnet_output(image_file.replace("test_", ""))
         image = cv2.imread(image_fp)
 
-        # cv2.imwrite(f"./vis/{self.classes.index(c)}_{image_file}", image)
+        cv2.imwrite(f"../../vis/{self.classes.index(c)}_{image_file}", image)
 
         if self.augmentor is not None:
-            image, pose, vis_image = self.augmentor(image, pose, image_file)
+            image, _, vis_image = self.augmentor(image, pose, image_file)
         
-        # image = cv2.resize(image, (224, 224))
+        image = cv2.resize(image, (180, 180))
         # pose = self.scale_pose(pose, (120,160), (160,160))
         # pose = pose_to_embedding_v2(pose)
-        # if self.transform is not None:
-        #     image = self.transform(image)
-        # image = self.NORMALIZE(image)
+        if self.transform is not None:
+            image = self.transform(image)
+        image = self.NORMALIZE(image)
 
         
         if image_file in self.update_classes:
             label = self.classes.index(str(self.update_classes[image_file]))
         else:
             label = self.classes.index(c)
-        return pose, label
+        # if label in [0,1,2]: 
+        #     label = 0
+        # elif label in [3,4,5]:
+        #     label = 1
+        # else:
+        #     label = 2
+        return image, pose, label
 
 
 def batch_mean_and_std(loader):

@@ -196,7 +196,7 @@ def main():
         prediction = []
         labels = []
         for i, batch in enumerate(testloader):
-            pose, label = batch
+            _, pose, label = batch
             output = PoseRefinder(pose, c)()
 
             label = label.numpy()

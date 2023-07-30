@@ -4,6 +4,7 @@ import argparse
 import json
 import numpy as np
 
+
 def parse_argument():
     """
     Parse arguments from command line
@@ -17,7 +18,7 @@ def parse_argument():
     parser = argparse.ArgumentParser(
         "Run script to predict pose classification model")
     parser.add_argument('--image-dir', type=str,
-                        help='Path to training config file', default="/data2/samba/public/TrungPQ/22B/in-bed-posture-classification/data/coco/images/slp_train/")
+                        help='Path to training config file', default="/data/users/trungpq/coco/images/slp_val")
     parser.add_argument('--hrnet-feature', type=str,
                         help='Path to training config file', default="/data2/samba/public/TrungPQ/22B/pose_data/POSE_SLP2022")
     parser.add_argument("--mapping-file", type=str,

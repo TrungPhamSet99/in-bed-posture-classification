@@ -12,7 +12,7 @@
         "num_workers": 4,
         "pin_memory": false,
         "test_transform": "ToTensor",
-        "augmentation_config_path": "/data/users/trungpq/23A/in-bed-posture-classification/pose_classification/cfg/augmentation.json"
+        "augmentation_config_path": null
     },
     "model_config":"./cfg/model_config/pose_classifier_v3.yaml"
 }
