@@ -56,7 +56,7 @@ def to_onehot(inputs, num_classes):
     return np.squeeze(np.eye(num_classes)[inputs.reshape(-1)])
 
 def adjust_learning_rate(optimizer, epoch, lr):
-    lr = lr * (0.1 ** (epoch // 10))
+    lr = lr * (0.1 ** (epoch // 40))
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr
 
@@ -267,9 +267,40 @@ def pose_to_embedding_v2(pose):
     distance_embedding = build_embedding_from_distance(norm_input)
 
     # return torch.from_numpy(np.concatenate((norm_input, distance_embedding), axis=0).flatten())
-    embedding = torch.from_numpy(np.transpose(np.concatenate((norm_input, distance_embedding), axis=0))).flatten()
+    embedding = torch.from_numpy(np.transpose(np.concatenate((norm_input, distance_embedding), axis=0)))
     # embedding = torch.from_numpy(np.transpose(norm_input)).flatten()
     return embedding
+
+def leg_pose_to_embedding(leg_pose, left_angle, right_angle):
+    if isinstance(leg_pose, torch.Tensor):
+        leg_pose = leg_pose.cpu().detach().numpy()
+    reshaped_input = np.reshape(leg_pose, (14,2))
+    distance_embedding = np.transpose(build_leg_distance_embedding(reshaped_input))
+    norm_input = np.transpose(normalize_pose(reshaped_input))
+    # norm_input = norm_input[:,:6]
+    angles = np.array([[left_angle], [right_angle]])
+    embedding = torch.from_numpy(np.concatenate((norm_input, distance_embedding, angles), axis=1))
+    return embedding
+
+def build_leg_distance_embedding(pose):
+    
+    distance_embedding = np.array([
+        get_distance_by_name(pose, "Left Ankle", "Right Ankle"),
+        get_distance_by_name(pose, "Left Hip", "Right Hip"),
+        get_distance_by_name(pose, "Left Knee", "Right Knee"),
+        get_distance_by_name(pose, "Left Hip", "Left Knee"),
+        get_distance_by_name(pose, "Left Knee", "Left Ankle"),
+        get_distance_by_name(pose, "Right Hip", "Right Knee"),
+        get_distance_by_name(pose, "Right Knee", "Right Ankle"),
+        get_distance_by_name(pose, "Left Hip", "Right Knee"),
+        get_distance_by_name(pose, "Left Hip", "Right Ankle"),
+        get_distance_by_name(pose, "Left Knee", "Right Hip"),
+        get_distance_by_name(pose, "Left Knee", "Right Ankle"),
+        get_distance_by_name(pose, "Left Ankle", "Right Knee"),
+        get_distance_by_name(pose, "Left Ankle", "Right Hip")
+    ])
+    return distance_embedding
+    
 
 def load_config(path):
     """Load JSON or yaml config from path

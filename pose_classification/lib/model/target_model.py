@@ -84,6 +84,7 @@ class PoseClassifierV2_1(BasePoseClassifier):
                                            config[key][0], config[key][1]),
                                        nn.ReLU())
                 setattr(self, _key, module)
+        self.last = nn.Linear(512, 3)
 
     def forward(self, xb):
         """Forward path for PoseClassifierV2_1 model
@@ -100,7 +101,7 @@ class PoseClassifierV2_1(BasePoseClassifier):
         torch.Tensor
             Output from model as torch.Tensor after softmax activation
         """
-        # xb = xb.float()
+        xb = xb.float()
         # xb.to(device)
         conv_block_list = [block for block in list(
             self.config.keys()) if "conv" in block]
@@ -117,7 +118,7 @@ class PoseClassifierV2_1(BasePoseClassifier):
             xb = linear_block(xb)
         # output = self.softmax(xb)
         # return output
-        return xb
+        return self.last(xb)
 
 
 class PoseClassifierV2_2(BasePoseClassifier):

@@ -9,17 +9,21 @@ import os
 import json
 import numpy as np
 import torch
+import warnings
 
 from torchvision.transforms import ToTensor, Compose, Normalize
 from torch.utils.data import Dataset, DataLoader
-from utils.general import pose_to_embedding_v2, to_onehot
+from utils.general import pose_to_embedding_v2, to_onehot, leg_pose_to_embedding
 from data.augmentation import Augmentor
+
+warnings.filterwarnings('ignore')
 
 class NormalPoseDataset(Dataset):
     RGB_MEAN = [0.18988903, 0.18988903, 0.18988903]
     RGB_STD = [0.09772425, 0.09772425, 0.09772425]
     NORMALIZE = Compose([Normalize(mean=RGB_MEAN, std=RGB_STD)])
-    def __init__(self, data_dir, list_path, mapping_file, image_dir, classes = None, augment_config_path=None, transform=None):
+    def __init__(self, data_dir: str, list_path: str, mapping_file: str, image_dir: str, 
+                 classes = None, augment_config_path=None, transform=None, load_from_gt=True):
         """Constructor for NormalPoseDataset
 
         Parameters
@@ -41,6 +45,7 @@ class NormalPoseDataset(Dataset):
         self.mapping = json.load(open(mapping_file, "r"))
         self.image_keys = list(self.mapping.keys())
         self.image_dir = image_dir
+        self.load_from_gt = load_from_gt
         if "train" in self.data_list_path:
             self.mode = "train"
         else:
@@ -146,37 +151,80 @@ class NormalPoseDataset(Dataset):
             image_fp = image_fp.replace("train_", "slp_train/")
         else:
             image_fp = image_fp.replace("test_", "slp_val/")
-        # pose = np.load(pose_fp)
-
-        pose = self.load_pose_from_hrnet_output(image_file.replace("test_", ""))
+        if self.load_from_gt:
+            pose = np.load(pose_fp)
+        else:
+            pose = self.load_pose_from_hrnet_output(image_file.replace("test_", ""))
+        angle_left, angle_right = self.calculate_angles(pose)
         image = cv2.imread(image_fp)
-
-        cv2.imwrite(f"../../vis/{self.classes.index(c)}_{image_file}", image)
-
+        image = self.crop_leg_from_image(image, pose)
         if self.augmentor is not None:
-            image, _, vis_image = self.augmentor(image, pose, image_file)
+            image, pose, _= self.augmentor(image, pose, image_file)
+            cv2.imwrite(f"../../vis/{image_file}", image)
         
         image = cv2.resize(image, (180, 180))
         # pose = self.scale_pose(pose, (120,160), (160,160))
-        # pose = pose_to_embedding_v2(pose)
+        pose = leg_pose_to_embedding(pose, angle_left, angle_right)
         if self.transform is not None:
             image = self.transform(image)
         image = self.NORMALIZE(image)
 
-        
         if image_file in self.update_classes:
             label = self.classes.index(str(self.update_classes[image_file]))
         else:
             label = self.classes.index(c)
-        # if label in [0,1,2]: 
-        #     label = 0
-        # elif label in [3,4,5]:
-        #     label = 1
-        # else:
-        #     label = 2
+
+        if label in [0,3,6]: 
+            label = 0
+        elif label in [1,4,7]:
+            label = 1
+        else:
+            label = 2
+
         return image, pose, label
 
+    @staticmethod
+    def crop_leg_from_image(image, pose):
+        sub_pose = pose[:, :6]
+        x = sub_pose[0,:]
+        y = sub_pose[1,:]
+        x_max, x_min = int(np.max(x)), int(np.min(x))
+        y_max, y_min = int(np.max(y)), int(np.min(y))
+        cropped_image = image[y_min-20:y_max+20, x_min-20:x_max+20, :]
+        return cropped_image
+    
+    def calculate_angle(self, first_line, second_line):
+        def slop(line):
+            x1, y1, x2, y2 = line[0], line[1], line[2], line[3]
+            if x2 - x1 == 0:
+                return 1e9
+            else:
+                return (y2-y1)/(x2-x1)
+        
+        def angle(first_slope, second_slope):
+            return math.degrees(math.atan((second_slope-first_slope)/(1+(second_slope*first_slope))))
 
+        first_slope = slop(first_line)
+        second_slope = slop(second_line)
+
+        return abs(angle(first_slope, second_slope))
+
+    def calculate_angles(self, pose):
+        sub_pose = pose[:,:6]
+        right_side = [sub_pose[0][0], sub_pose[1][0],
+                      sub_pose[0][1], sub_pose[1][1],
+                      sub_pose[0][2], sub_pose[1][2]]
+        left_side = [sub_pose[0][3], sub_pose[1][3],
+                     sub_pose[0][4], sub_pose[1][4],
+                     sub_pose[0][5], sub_pose[1][5]]
+        left_angle = self.calculate_angle((left_side[0], left_side[1], left_side[2], left_side[3]),
+                                        (left_side[2], left_side[3], left_side[4], left_side[5]))
+        
+        right_angle = self.calculate_angle((right_side[0], right_side[1], right_side[2], right_side[3]),
+                                        (right_side[2], right_side[3], right_side[4], right_side[5]))
+        
+        return left_angle, right_angle
+    
 def batch_mean_and_std(loader):
     cnt = 0
 

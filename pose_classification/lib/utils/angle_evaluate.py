@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 import math
+import cv2
 from typing import Any
 import torch
 import torch.nn as nn
@@ -37,7 +38,7 @@ class PoseRefinder:
         return abs(angle(first_slope, second_slope))
     
 
-    def __call__(self):
+    def __call__(self, label, index):
         neck_coord = self.pose[:,12]
         sub_pose = self.pose[:,:6]
         center_of_hip = (sub_pose[:,2] + sub_pose[:,5]) / 2
@@ -134,11 +135,7 @@ class PoseRefinder:
                         pred = 2
                     else:
                         pred = 1  
-                        
-        # if pred != label:
-        #     print(image_file, left_angle, right_angle, angle_diff, knee_distance, feet_distance, knee_y, feet_y, pred, label)
-        #     cv2.imwrite(f"./vis/{label}_{image_file}", image)
-        
+    
         return pred
 
 
@@ -181,12 +178,13 @@ def main():
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         test_dataset = NormalPoseDataset(data_config['data_dir'],
-                                     data_config['test_list'],
-                                     data_config['mapping_file_test'],
-                                     data_config['image_dir'],
-                                     classes = c,
-                                     augment_config_path=data_config['augmentation_config_path'],
-                                     transform = Compose([eval(data_config["test_transform"])()]))
+                                         data_config['test_list'],
+                                         data_config['mapping_file_test'],
+                                         data_config['image_dir'],
+                                         classes = c,
+                                         augment_config_path=data_config['augmentation_config_path'],
+                                         transform = Compose([eval(data_config["test_transform"])()]),
+                                         load_from_gt=False)
     
         testloader = torch.utils.data.DataLoader(test_dataset,
                                                     batch_size=data_config['batch_size'],
@@ -196,9 +194,10 @@ def main():
         prediction = []
         labels = []
         for i, batch in enumerate(testloader):
-            _, pose, label = batch
-            output = PoseRefinder(pose, c)()
-
+            image, pose, label = batch
+            image = image[0,:,:,:].detach().cpu().numpy()
+            image = np.transpose(image, (2,1,0))
+            output = PoseRefinder(pose, c)(label, i)
             label = label.numpy()
             labels += label.tolist()
             prediction.append(output)

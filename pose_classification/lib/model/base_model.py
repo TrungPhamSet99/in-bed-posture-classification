@@ -40,8 +40,9 @@ class BasePoseClassifier(nn.Module):
                     conv_layer = nn.Conv1d(config[key][0], config[key][1], config[key][2],
                                            padding=config[key][3])
                 if model_name == "PoseClassifierV2_1":
-                    module = [conv_layer, nn.ReLU(
-                    ), nn.BatchNorm1d(config[key][1])]
+                    # module = [conv_layer, nn.ReLU(
+                    # ), nn.BatchNorm1d(config[key][1])]
+                     module = [conv_layer, nn.ReLU()]
                 elif model_name == "PoseClassifierV2_2":
                     module = [conv_layer, nn.BatchNorm1d(
                         config[key][1]), nn.ReLU()]
@@ -55,12 +56,6 @@ class BasePoseClassifier(nn.Module):
                 setattr(self, _key, sub_net)
             else:
                 pass
-
-        self.dropout = nn.Dropout(p=0.5)
-        self.softmax = nn.Softmax(dim=0)
-        self.dropout1 = nn.Dropout(.5)
-        self.dropout2 = nn.Dropout(.3)
-        self.dropout3 = nn.Dropout(.2)
 
     @abstractmethod
     def forward(self, xb, device):

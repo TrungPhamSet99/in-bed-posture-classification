@@ -1,12 +1,18 @@
 import torch
+import json
+import os
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 import torch.nn as nn
-from baseline.dataset_config import dataset_config 
+from baseline.config import dataset_config, train_config
 from data.normal_dataset import NormalPoseDataset
 from torchvision.transforms import ToTensor, Compose
+
+import torchvision.models as models
 from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 from model.efficientnet import EfficientNet
@@ -16,17 +22,19 @@ from utils.general import adjust_learning_rate
 from utils.general import load_config, accuracy, plot_confusion_matrix, colorstr, accuracy
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.metrics import precision_recall_fscore_support as score
+from model.target_model import PoseClassifierV2_1
+from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 CLASSES = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 # CLASSES = ["1", "2", "3"]
 
-class Model(nn.Module):
+class EfficientNetB0(nn.Module):
     def __init__(self):
-        super(Model, self).__init__()
+        super(EfficientNetB0, self).__init__()
         self.feature_extractor = EfficientNet.from_pretrained("efficientnet-b0")
         self.dropout1 = nn.Dropout(0.4)
-        self.linear = LinearBlock(1280, 3)
+        self.linear = LinearBlock(1280, 9)
         self.relu = nn.ReLU()
         self.pool = nn.AdaptiveAvgPool2d(1)
 
@@ -36,8 +44,45 @@ class Model(nn.Module):
         feature = self.feature_extractor.extract_features(inputs)
         return self.linear(feature)
     
-def get_model():
-    return Model()
+
+class LinearClassifier(nn.Module):
+    def __init__(self):
+        super(LinearClassifier, self).__init__()
+        self.linear1 = nn.Linear(56, 32)
+        self.linear2 = nn.Linear(32, 16)
+        self.linear3 = nn.Linear(16, 3)
+    
+    def forward(self, inputs):
+        inputs = torch.flatten(inputs, start_dim=1).float()
+        inputs = F.relu(self.linear1(inputs))
+        inputs = F.relu(self.linear2(inputs))
+        return self.linear3(inputs)
+    
+    
+def get_baseline_model(model_name: str):
+    if model_name == "efficientnet":
+        return EfficientNetB0()
+    elif model_name == "resnet18":
+        model = models.resnet18(pretrained=True)
+        num_classes = 3
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, num_classes)
+        return model
+    elif model_name == "vgg16":
+        vgg16 = models.vgg16(pretrained=False)
+        num_classes = 9
+        in_features = vgg16.classifier[-1].in_features
+        vgg16.classifier[-1] = nn.Linear(in_features, num_classes)
+        return vgg16
+    else:
+        raise ValueError(f"Do not support model {model_name}")
+    
+
+def get_leg_pose_classification():
+    cfg = json.load(open("../../cfg/model_config/pose_classifier_v2.1.json"))
+    model = PoseClassifierV2_1(cfg, "PoseClassifierV2_1")
+    return model
+
 
 def build_dataloader(data_cfg):
     # Build train/test dataloader
@@ -67,9 +112,12 @@ def build_dataloader(data_cfg):
                                                    pin_memory=data_cfg['pin_memory'])
     return train_dataloader, test_dataloader
 
-def train(model, train_dataloader, test_dataloader, num_epochs=50):
+def train(model, train_dataloader, test_dataloader, num_epochs=50, use_pose=False):
+    loss_report = []
+    best_loss = np.inf
+    best_acc = -np.inf
     # define loss and optimizer
-    train_criterion = nn.CrossEntropyLoss()
+    train_criterion = LabelSmoothingCrossEntropy(0.05)
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0001)
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [10, 15], 0.1)   
     # device configuration
@@ -80,16 +128,28 @@ def train(model, train_dataloader, test_dataloader, num_epochs=50):
         print(f"Epoch {epoch}")
         adjust_learning_rate(optimizer, epoch, 0.001)
         for i, batch in enumerate(tqdm(train_dataloader)):
-            image, label = batch[0].to(device), batch[2].to(device)
+            image, pose, label = batch[0].to(device), batch[1].to(device), batch[2].to(device)
             optimizer.zero_grad()
-            loss = train_step(model, image, label, train_criterion)
+            if use_pose:
+                loss = train_step(model, pose, label, train_criterion)
+            else:
+                loss = train_step(model, image, label, train_criterion)
             loss = torch.mean(loss)
             loss.backward()
             optimizer.step()
         print(f'Epoch {epoch + 1}, Train Loss: {loss}')
-        results = validate(model, test_dataloader, train_criterion)
+        results = validate(model, test_dataloader, train_criterion, use_pose)
         epoch_end(epoch, results)
+        loss_report.append({"Train_loss": loss, "Val_loss": results["val_loss"]})
+        if results['val_loss'] < best_loss:
+            best_loss = results['val_loss']
+            save_model(model, train_config["output_dir"], "best_loss_model.pth")
+        if results['val_acc'] > best_acc:
+            best_acc = results['val_acc']
+            save_model(model, train_config["output_dir"], "best_acc_model.pth")
 
+    with open(os.path.join(train_config['output_dir'], "loss_report.json"), "w") as f:
+            json.dump(loss_report, f)
     print(colorstr("Final test"))
     # Final test
     model.eval()
@@ -99,8 +159,11 @@ def train(model, train_dataloader, test_dataloader, num_epochs=50):
     labels = []
     with torch.no_grad():
         for idx, batch in enumerate(test_dataloader):
-            image, label = batch[0].to(device), batch[2].to(device)
-            output = model(image)
+            image, pose, label = batch[0].to(device), batch[1].to(device), batch[2].to(device)
+            if use_pose:
+                output = model(pose)
+            else:
+                output = model(image)
             _, pred = torch.max(output.data, 1)
             total += label.size(0)
             correct += (pred == label).sum().item()
@@ -128,23 +191,32 @@ def train(model, train_dataloader, test_dataloader, num_epochs=50):
     print("------------------------------------------------------")
 
 
-def train_step(model, image, label, criterion):
+def save_model(model, output_dir, filename):
+    print(f"Info: Save checkpoint named {filename}")
+    save_path = os.path.join(output_dir, filename)
+    torch.save(model.state_dict(), save_path)
+
+def train_step(model, input, label, criterion):
     model.train()
-    out = model(image)
+    # print(input[:, :, 19])
+    out = model(input)
     loss = criterion(out, label)
     return loss 
 
-def validate(model, test_loader, criterion):
+def validate(model, test_loader, criterion, use_pose):
     model.eval()
     with torch.no_grad():
-        outputs = [validate_step(model, batch, criterion) for batch in test_loader]
+        outputs = [validate_step(model, batch, criterion, use_pose) for batch in test_loader]
     
     return validate_epoch_end(outputs)
 
-def validate_step(model, batch, criterion):
+def validate_step(model, batch, criterion, use_pose):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    image, label = batch[0].to(device), batch[2].to(device)
-    out = model(image)
+    image, pose, label = batch[0].to(device), batch[1].to(device), batch[2].to(device)
+    if use_pose:
+        out = model(pose)
+    else:
+        out = model(image)
     loss = criterion(out, label)
     acc = accuracy(out, label)
     return {"val_loss": loss, "val_acc": acc}
@@ -161,8 +233,15 @@ def epoch_end(epoch, result):
                 epoch, result['val_loss'], result['val_acc']))
 
 if __name__ == "__main__":
-    model = get_model()
+    # Create output directory
+    if not os.path.isdir(train_config['output_dir']):
+        os.makedirs(train_config['output_dir'])
+    # Prepare model
+    baseline_model = get_baseline_model("resnet18")
+    leg_pose_model = get_leg_pose_classification()
+    # Prepare dataset
     train_dataloader, test_dataloader = build_dataloader(dataset_config)
-    train(model, train_dataloader, test_dataloader, num_epochs=30)
+    # train(LinearClassifier(), train_dataloader, test_dataloader, num_epochs=100, use_pose=True)
+    train(baseline_model, train_dataloader, test_dataloader, num_epochs=100)
 
 

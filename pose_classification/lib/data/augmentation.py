@@ -183,14 +183,14 @@ class Augmentor(object):
 
 
 
-    def __call__(self, image, keypoint, name, visualize=True):
-        # if random.random() < self.config["prob"]:
-        #     magnitude_x = random.randint(self.config["magnitude_x"][0], self.config["magnitude_x"][1])
-        #     magnitude_y = random.randint(self.config["magnitude_y"][0], self.config["magnitude_y"][1])
-        #     image = self.translate_image(image, (magnitude_x, magnitude_y))
-        #     image = self.geometric_transformation(image)
-        #     keypoint = self.augment_keypoint(keypoint, (magnitude_x, magnitude_y))
-
+    def __call__(self, image, keypoint, name, visualize=False):
+        if random.random() < self.config["prob"]:
+            magnitude_x = random.randint(self.config["magnitude_x"][0], self.config["magnitude_x"][1])
+            magnitude_y = random.randint(self.config["magnitude_y"][0], self.config["magnitude_y"][1])
+            image = self.translate_image(image, (magnitude_x, magnitude_y))
+            image = self.geometric_transformation(image)
+            keypoint = self.augment_keypoint(keypoint, (magnitude_x, magnitude_y))
+        vis_image = None
         if visualize:
             keypoint_list = keypoint.tolist()
             save_path = os.path.join("./vis/", name)
@@ -200,6 +200,7 @@ class Augmentor(object):
                 vis_image = cv2.circle(image, (x,y), 2, (255,0,0), 1)
                 # cv2.imwrite(save_path, vis_image)
         return image, keypoint, vis_image
+        
 
 
 
